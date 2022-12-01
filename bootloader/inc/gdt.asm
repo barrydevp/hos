@@ -40,5 +40,5 @@ gdt_descriptor:
     dd gdt_start ; address (32 bit)
 
 ; define some constants for later use
-CODE_SEG equ gdt_code - gdt_start
-DATA_SEG equ gdt_data - gdt_start 
+CODE_DESC equ gdt_code - gdt_start
+DATA_DESC equ gdt_data - gdt_start 
