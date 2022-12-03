@@ -12,7 +12,7 @@ bpbBytesPerSector   EQU 512
 SEC_BOOT_ADDR       EQU 0x50
 IMAGE_RMODE_BASE    EQU 0x3000
 IMAGE_PMODE_BASE    EQU 0x100000
-N_IMAGE_SECTORS     EQU 1
+N_IMAGE_SECTORS     EQU 20
 
 ; real code start from here
 
@@ -160,6 +160,7 @@ __setup:
     ;---------------------------------------;
 
     jmp CODE_DESC:IMAGE_PMODE_BASE; jump to our kernel! Note: This assumes Kernel's entry point is at 1 MB
+    ; jmp [IMAGE_PMODE_BASE + 18h]; jump to our kernel (at address of elf entry)! Note: This assumes Kernel's entry point is at 1 MB
 
 __debug:
 ; %include "inc/io32.asm"

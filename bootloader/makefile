@@ -1,5 +1,4 @@
 BUILD_DIR=../.build/bootloader
-DISK_IMG=$(BUILD_DIR)/disk.img
 
 BOOTLOADER_SRCS := $(wildcard *.asm)
 BOOTLOADER_OBJS := $(patsubst %.asm, $(BUILD_DIR)/%.o, $(BOOTLOADER_SRCS))
