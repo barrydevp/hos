@@ -1,0 +1,62 @@
+BUILD_DIR=.build
+
+MULTIBOOT_DIR=multiboot
+
+BOOTLOADER_BUILD_DIR=$(BUILD_DIR)/bootloader
+MULTIBOOT_BUILD_DIR=$(BUILD_DIR)/multiboot
+KERNEL_BUILD_DIR=$(BUILD_DIR)/kernel
+
+DISK_IMG=$(BUILD_DIR)/disk.img
+OS_ISO=$(BUILD_DIR)/hos.iso
+
+all: qemu-multiboot
+
+.PHONY: bootloader kernel-boot kernel-multiboot
+
+qemu-kernel: kernel-multiboot
+	# qemu-system-i386 -kernel $(KERNEL_BUILD_DIR)/kernel_multiboot.bin
+	qemu-system-i386 -kernel $(KERNEL_BUILD_DIR)/kernel_multiboot.elf -s -S
+
+qemu-multiboot: $(OS_ISO)
+	qemu-system-i386 -cdrom $(DISK_IMG) 
+	# qemu-system-i386 -cdrom $(DISK_IMG) -s -S
+
+$(OS_ISO): kernel-multiboot $(MULTIBOOT_DIR)/grub.cfg
+	mkdir -p $(MULTIBOOT_BUILD_DIR)/isodir/boot/grub
+	cp $(KERNEL_BUILD_DIR)/kernel_multiboot.bin $(MULTIBOOT_BUILD_DIR)/isodir/boot/hos.bin
+	cp $(MULTIBOOT_DIR)/grub.cfg $(MULTIBOOT_BUILD_DIR)/isodir/boot/grub/grub.cfg
+	grub-mkrescue -o $(OS_ISO) $(MULTIBOOT_BUILD_DIR)/isodir
+
+qemu-boot: $(DISK_IMG)
+	# qemu-system-i386 -machine q35 -fda $(DISK_IMG) -gdb tcp::26000 -S
+	# qemu-system-i386 -machine q35 -fda $(DISK_IMG) -gdb tcp::26000
+	qemu-system-i386 -machine q35 -fda $(DISK_IMG) 
+
+debug-boot: $(DISK_IMG)
+	qemu-system-i386 -machine q35 -fda $(DISK_IMG) -gdb tcp::26000 -S
+
+# disk.dis: bootdisk
+# 	objdump -z -D -b binary -m i686 $(DISK_IMG) | less
+
+# Rule to disassemble the kernel - may be useful to debug
+# kernel.dis: kernel
+# 	ndisasm -b 32 $(KERNEL_BUILD_DIR)/kernel.bin > $@
+
+$(DISK_IMG): bootloader kernel-boot
+	dd if=/dev/zero of=$(DISK_IMG) bs=512 count=2880
+	dd conv=notrunc if=$(BOOTLOADER_BUILD_DIR)/stage1.o of=$(DISK_IMG) bs=512 count=1 seek=0
+	dd conv=notrunc if=$(BOOTLOADER_BUILD_DIR)/stage2.o of=$(DISK_IMG) bs=512 count=1 seek=1
+	dd conv=notrunc if=$(KERNEL_BUILD_DIR)/kernel_boot.bin of=$(DISK_IMG) bs=512 count=1 seek=2
+	# dd conv=notrunc if=$(KERNEL_BUILD_DIR)/kernel.elf of=$(DISK_IMG) bs=512 count=15 seek=2
+
+bootloader:
+	@make -C bootloader
+
+kernel-boot:
+	@make -C kernel boot
+
+kernel-multiboot:
+	@make -C kernel multiboot
+
+clean:
+	@rm -r $(BUILD_DIR)/*

@@ -1,1 +1,6 @@
 .build
+*.d
+*.kernel
+*.o
+*.bin
+*.elf

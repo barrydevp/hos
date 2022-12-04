@@ -12,7 +12,7 @@ bpbBytesPerSector   EQU 512
 SEC_BOOT_ADDR       EQU 0x50
 IMAGE_RMODE_BASE    EQU 0x3000
 IMAGE_PMODE_BASE    EQU 0x100000
-N_IMAGE_SECTORS     EQU 20
+N_IMAGE_SECTORS     EQU 1
 
 ; real code start from here
 
