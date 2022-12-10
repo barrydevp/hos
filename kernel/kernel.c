@@ -2,7 +2,7 @@
  * kernel.c:0x00 */
 void dummy_test_entrypoint() {}
 
-int main() {
+int kernel_main_c() {
   char *video_memory = (char *)0xb8000;
   *video_memory = 'A';
   dummy_test_entrypoint();

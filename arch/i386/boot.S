@@ -84,7 +84,7 @@ _start:
     stack since (pushed 0 bytes so far), so the alignment has thus been
     preserved and the call is well defined.
     */
-    call main
+    call kernel_main
 
     /*
     If the system has nothing more to do, put the computer into an

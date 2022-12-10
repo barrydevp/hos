@@ -9,12 +9,15 @@ PHONY =
 
 # Cross compiler binaries
 CC = ${TARGET}-gcc
+LD = ${TARGET}-ld
 NM = ${TARGET}-nm
 CXX= ${TARGET}-g++
 AR = ${TARGET}-ar
 AS = ${TARGET}-as
 OC = ${TARGET}-objcopy
 STRIP= ${TARGET}-strip
+
+CARGO = cargo
 
 include make.config
 include arch/$(ARCH)/make.config
@@ -38,6 +41,13 @@ KERNEL_OBJS += $(patsubst %.c,%.o,$(wildcard kernel/*/*.c))
 
 # Assembly sources only come from the arch-dependent directory
 KERNEL_ASMOBJS  = $(filter-out kernel/symbols.o,$(patsubst %.S,%.o,$(wildcard kernel/arch/${ARCH}/*.S)))
+
+# target for rust build
+RUST_TARGET = ${ARCH}-unknown-hos
+RUST_LIB_DIR = target/${RUST_TARGET}/debug
+# Rust sources library
+KERNEL_CORE_SRCS = $(wildcard kernel-core/**/*.rs)
+KERNEL_CORE_LIB = ${RUST_LIB_DIR}/libkernel_core.a
 
 # The arch sources file
 ARCH_SRCS  = $(wildcard arch/${ARCH}/*.c)
@@ -100,8 +110,8 @@ qemu-kernel: hos.kernel
 	qemu-system-i386 -kernel $^
 	# qemu-system-i386 -kernel $^ -s -S
 
-hos.kernel: arch/$(ARCH)/linker.ld $(KERNEL_OBJS) $(ARCH_OBJS) $(ARCH_ASMOBJS) $(CRTS)
-	$(CC) -T arch/$(ARCH)/linker.ld $(K_CFLAGS) -nostdlib -o $@ $(filter-out arch/$(ARCH)/linker.ld, $^)
+hos.kernel: arch/$(ARCH)/linker.ld $(KERNEL_CORE_LIB) $(KERNEL_OBJS) $(ARCH_OBJS) $(ARCH_ASMOBJS) $(CRTS)
+	$(CC) -T arch/$(ARCH)/linker.ld $(K_CFLAGS) -nostdlib -o $@ $(ARCH_OBJS) $(ARCH_ASMOBJS) $(CRTS) $(KERNEL_OBJS) $(KERNEL_CORE_LIB)
 
 kernel/sys/version.o: ${KERNEL_SRCS}
 
@@ -121,6 +131,9 @@ kernel/%.o: kernel/%.c ${KERNEL_HDRS}
 
 arch/%.o: arch/%.c ${KERNEL_HDRS}
 	${CC} ${K_CFLAGS} -nostdlib -Iinclude -c -o $@ $<
+
+$(RUST_LIB_DIR)/*.a: ${KERNEL_CORE_SRCS}
+	${CARGO} build
 
 clean:
 	-rm -f ${KERNEL_ASMOBJS}
