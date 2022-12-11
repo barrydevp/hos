@@ -2,6 +2,7 @@
 *.d
 *.kernel
 *.o
+*.a
 *.bin
 *.elf
 /target
