@@ -1,5 +1,5 @@
 [package]
-name = "kernel-core"
+name = "rskernel"
 version = "0.0.0"
 edition = "2021"
 
@@ -8,4 +8,5 @@ edition = "2021"
 [dependencies]
 
 [lib]
+path = "src/kernel.rs"
 crate-type = ["staticlib"]

@@ -46,8 +46,8 @@ KERNEL_ASMOBJS  = $(filter-out kernel/symbols.o,$(patsubst %.S,%.o,$(wildcard ke
 RUST_TARGET = ${ARCH}-unknown-hos
 RUST_LIB_DIR = target/${RUST_TARGET}/debug
 # Rust sources library
-KERNEL_CORE_SRCS = $(wildcard kernel-core/**/*.rs)
-KERNEL_CORE_LIB = ${RUST_LIB_DIR}/libkernel_core.a
+RS_KERNEL_SRCS = $(wildcard rskernel/**/*.rs)
+RS_KERNEL_LIB = ${RUST_LIB_DIR}/librskernel.a
 
 # The arch sources file
 ARCH_SRCS  = $(wildcard arch/${ARCH}/*.c)
@@ -110,8 +110,8 @@ qemu-kernel: hos.kernel
 	qemu-system-i386 -kernel $^
 	# qemu-system-i386 -kernel $^ -s -S
 
-hos.kernel: arch/$(ARCH)/linker.ld $(KERNEL_CORE_LIB) $(KERNEL_OBJS) $(ARCH_OBJS) $(ARCH_ASMOBJS) $(CRTS)
-	$(CC) -T arch/$(ARCH)/linker.ld $(K_CFLAGS) -nostdlib -o $@ $(ARCH_OBJS) $(ARCH_ASMOBJS) $(CRTS) $(KERNEL_OBJS) $(KERNEL_CORE_LIB)
+hos.kernel: arch/$(ARCH)/linker.ld $(RS_KERNEL_LIB) $(KERNEL_OBJS) $(ARCH_OBJS) $(ARCH_ASMOBJS) $(CRTS)
+	$(CC) -T arch/$(ARCH)/linker.ld $(K_CFLAGS) -nostdlib -o $@ $(ARCH_OBJS) $(ARCH_ASMOBJS) $(CRTS) $(KERNEL_OBJS) $(RS_KERNEL_LIB)
 
 kernel/sys/version.o: ${KERNEL_SRCS}
 
@@ -132,7 +132,7 @@ kernel/%.o: kernel/%.c ${KERNEL_HDRS}
 arch/%.o: arch/%.c ${KERNEL_HDRS}
 	${CC} ${K_CFLAGS} -nostdlib -Iinclude -c -o $@ $<
 
-$(RUST_LIB_DIR)/*.a: ${KERNEL_CORE_SRCS}
+$(RUST_LIB_DIR)/%.a: ${RS_KERNEL_SRCS}
 	${CARGO} build
 
 clean:

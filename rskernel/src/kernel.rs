@@ -20,12 +20,12 @@ pub extern "C" fn kernel_main() -> ! {
         *video_memory = 'A' as u8;
     }
 
-    // for (i, &byte) in HELLO.iter().enumerate() {
-    //     unsafe {
-    //         *vga_buffer.offset(i as isize * 2) = byte;
-    //         *vga_buffer.offset(i as isize * 2 + 1) = 0xb;
-    //     }
-    // }
+    for (i, &byte) in HELLO.iter().enumerate() {
+        unsafe {
+            *video_memory.offset(i as isize * 2) = byte;
+            *video_memory.offset(i as isize * 2 + 1) = 0xb;
+        }
+    }
 
     loop {}
 }
