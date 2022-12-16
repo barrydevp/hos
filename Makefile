@@ -107,7 +107,7 @@ all: qemu-kernel
 PHONY += qemu-kernel
 
 qemu-kernel: hos.kernel
-	qemu-system-i386 -kernel $^
+	qemu-system-i386 -nographic -curses -kernel $^
 	# qemu-system-i386 -kernel $^ -s -S
 
 hos.kernel: arch/$(ARCH)/linker.ld $(RS_KERNEL_LIB) $(KERNEL_OBJS) $(ARCH_OBJS) $(ARCH_ASMOBJS) $(CRTS)
@@ -150,6 +150,7 @@ clean:
 	-rm -f $(BASE)/bin/kuroko
 	-rm -f $(GCC_SHARED)
 	-rm -f boot/efi/*.o boot/bios/*.o
+	-$(CARGO) clean
 
 $(BASE)/lib/ld.so: linker/linker.c $(BASE)/lib/libc.a | dirs $(LIBC)
 	$(CC) -g -static -Wl,-static $(CFLAGS) -z max-page-size=0x1000 -o $@ -Os -T linker/link.ld $<
