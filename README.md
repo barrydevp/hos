@@ -2,7 +2,7 @@
 
 Hobby or hope?
 
-My life is a journey so do my operating system, haha.
+Written in 3 maybe 4 programing languages, asm, C, Rust, Zig(future).
 
 # Prerequisites
 
