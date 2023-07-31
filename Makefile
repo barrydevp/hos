@@ -1,26 +1,5 @@
-TOOLCHAIN=tools
-BASE=base
-
-DEFAULT_HOST=i686-elf
-HOST=DEFAULT_HOST
-ARCH=i386
-
-PHONY =
-
-# Cross compiler binaries
-CC = ${TARGET}-gcc
-LD = ${TARGET}-ld
-NM = ${TARGET}-nm
-CXX= ${TARGET}-g++
-AR = ${TARGET}-ar
-AS = ${TARGET}-as
-OC = ${TARGET}-objcopy
-STRIP= ${TARGET}-strip
-
-CARGO = cargo
-
 include make.config
-include arch/$(ARCH)/make.config
+include $(SRC)/arch/$(ARCH)/make.config
 
 # CFLAGS for kernel objects and modules
 K_CFLAGS  = -ffreestanding -O2 -g -lgcc
@@ -31,37 +10,55 @@ K_CFLAGS += ${ARCH_KERNEL_CFLAGS}
 K_CFLAGS += -D_KERNEL_ -DKERNEL_ARCH=${ARCH}
 K_CFLAGS += -DKERNEL_GIT_TAG=0.0.0
 
+# LDFLAGS for kernel
+K_LDFLAGS  = -ffreestanding -O2 -nostdlib -lgcc
+
 # These sources are used to determine if we should update symbols.o
-KERNEL_SRCS  = $(wildcard kernel/*.c)
-KERNEL_SRCS += $(wildcard kernel/*/*.c)
+KERNEL_SRCS  = $(wildcard $(SRC)/kernel/*.c)
+KERNEL_SRCS += $(wildcard $(SRC)/kernel/*/*.c)
 
 # Automatically find kernel sources from relevant paths
-KERNEL_OBJS  = $(patsubst %.c,%.o,$(wildcard kernel/*.c))
-KERNEL_OBJS += $(patsubst %.c,%.o,$(wildcard kernel/*/*.c))
+KERNEL_OBJS  = $(patsubst %.c,%.o,$(wildcard $(SRC)/kernel/*.c))
+KERNEL_OBJS += $(patsubst %.c,%.o,$(wildcard $(SRC)/kernel/*/*.c))
 
 # Assembly sources only come from the arch-dependent directory
-KERNEL_ASMOBJS  = $(filter-out kernel/symbols.o,$(patsubst %.S,%.o,$(wildcard kernel/arch/${ARCH}/*.S)))
+KERNEL_ASMOBJS  = $(filter-out $(SRC)/kernel/symbols.o,$(patsubst %.S,%.o,$(wildcard $(SRC)/kernel/arch/${ARCH}/*.S)))
+
+# Kernel Linker script
+KERNEL_LINKERLD = $(SRC)/arch/$(ARCH)/linker.ld
+
+# kernel Header
+
+KERNEL_HDRS  = $(wildcard include/kernel/*.h)
+KERNEL_HDRS += $(wildcard include/kernel/*/*.h)
+
+HEADERS = $(wildcard include/*.h)
 
 # target for rust build
 RUST_TARGET = ${ARCH}-unknown-hos
 RUST_LIB_DIR = target/${RUST_TARGET}/debug
 # Rust sources library
-RS_KERNEL_SRCS = $(wildcard rskernel/**/*.rs)
+RS_KERNEL_SRCS = $(wildcard $(SRC)/rskernel/**/*.rs)
 RS_KERNEL_LIB = ${RUST_LIB_DIR}/librskernel.a
 
 # The arch sources file
-ARCH_SRCS  = $(wildcard arch/${ARCH}/*.c)
-ARCH_SRCS += $(wildcard arch/${ARCH}/*/*.c)
-ARCH_SRCS += $(wildcard arch/${ARCH}/*.S)
-ARCH_SRCS += $(wildcard arch/${ARCH}/*.asm)
+ARCH_SRCS  = $(wildcard $(SRC)/arch/${ARCH}/*.c)
+ARCH_SRCS += $(wildcard $(SRC)/arch/${ARCH}/*/*.c)
+ARCH_SRCS += $(wildcard $(SRC)/arch/${ARCH}/*.S)
+ARCH_SRCS += $(wildcard $(SRC)/arch/${ARCH}/*.asm)
 
 # Automatically find arch sources from relevant paths
-ARCH_OBJS  = $(patsubst %.c,%.o,$(wildcard arch/${ARCH}/*.c))
-ARCH_OBJS += $(patsubst %.c,%.o,$(wildcard arch/${ARCH}/*/*.c))
+ARCH_OBJS  = $(patsubst %.c,%.o,$(wildcard $(SRC)/arch/${ARCH}/*.c))
+ARCH_OBJS += $(patsubst %.c,%.o,$(wildcard $(SRC)/arch/${ARCH}/*/*.c))
 
 # Assembly sources only come from the arch-dependent directory
-ARCH_ASMOBJS  = $(patsubst %.S,%.o,$(wildcard arch/${ARCH}/*.S))
-ARCH_ASMOBJS += $(patsubst %.asm,%.o,$(wildcard arch/${ARCH}/*.asm))
+ARCH_OBJS += $(patsubst %.S,%.o,$(wildcard $(SRC)/arch/${ARCH}/*.S))
+ARCH_OBJS += $(patsubst %.S,%.o,$(wildcard $(SRC)/arch/${ARCH}/*/*.S))
+ARCH_OBJS += $(patsubst %.asm,%.o,$(wildcard $(SRC)/arch/${ARCH}/*.asm))
+
+# Arch Header
+ARCH_HDRS  = $(wildcard include/arch/${ARCH}/*.h)
+ARCH_HDRS += $(wildcard include/arch/${ARCH}/*/*.h)
 
 # Kernel modules are one file = one module; if you want to build more complicated
 # modules, you could potentially use `ld -r` to turn multiple source objects into
@@ -71,13 +68,13 @@ ARCH_ASMOBJS += $(patsubst %.asm,%.o,$(wildcard arch/${ARCH}/*.asm))
 
 EMU = qemu-system-${ARCH}
 
-APPS=$(patsubst apps/%.c,%,$(wildcard apps/*.c))
+APPS=$(patsubst $(SRC)/apps/%.c,%,$(wildcard apps/*.c))
 APPS_X=$(foreach app,$(APPS),$(BASE)/bin/$(app))
 APPS_Y=$(foreach app,$(APPS),.make/$(app).mak)
 APPS_SH=$(patsubst apps/%.sh,%.sh,$(wildcard apps/*.sh))
 APPS_SH_X=$(foreach app,$(APPS_SH),$(BASE)/bin/$(app))
 
-LIBS=$(patsubst lib/%.c,%,$(wildcard lib/*.c))
+LIBS=$(patsubst $(SRC)/lib/%.c,%,$(wildcard lib/*.c))
 LIBS_X=$(foreach lib,$(LIBS),$(BASE)/lib/libtoaru_$(lib).so)
 LIBS_Y=$(foreach lib,$(LIBS),.make/$(lib).lmak)
 
@@ -87,49 +84,56 @@ CFLAGS += -Wall -Wextra -Wno-unused-parameter
 CFLAGS += -I. -Iapps
 CFLAGS += -fplan9-extensions ${ARCH_USER_CFLAGS}
 
-LIBC_OBJS  = $(patsubst %.c,%.o,$(wildcard libc/*.c))
-LIBC_OBJS += $(patsubst %.c,%.o,$(wildcard libc/*/*.c))
-LIBC_OBJS += $(patsubst %.c,%.o,$(wildcard libc/arch/${ARCH}/*.c))
+LIBC_OBJS  = $(patsubst %.c,%.o,$(wildcard $(SRC)/libc/*.c))
+LIBC_OBJS += $(patsubst %.c,%.o,$(wildcard $(SRC)/libc/*/*.c))
+LIBC_OBJS += $(patsubst %.c,%.o,$(wildcard $(SRC)/libc/arch/${ARCH}/*.c))
 
 GCC_SHARED = $(BASE)/usr/lib/libgcc_s.so.1 $(BASE)/usr/lib/libgcc_s.so
 
 CRTBEGIN_OBJ:=$(shell $(CC) $(CFLAGS) -print-file-name=crtbegin.o)
 CRTEND_OBJ:=$(shell $(CC) $(CFLAGS) -print-file-name=crtend.o)
-CRTS = libc/arch/$(ARCH)/crti.o $(CRTBEGIN_OBJ) $(CRTEND_OBJ) libc/arch/$(ARCH)/crtn.o
+CRTS = $(SRC)/libc/arch/$(ARCH)/crti.o $(CRTBEGIN_OBJ) $(CRTEND_OBJ) $(SRC)/libc/arch/$(ARCH)/crtn.o
 # CRTS = $(BASE)/lib/crt0.o $(BASE)/lib/crti.o $(BASE)/lib/crtn.o
 
 LIBC = $(BASE)/lib/libc.so $(GCC_SHARED)
 
-PHONY += all system clean run shell
+PHONY += all all-c system clean run shell
 
 all: qemu-kernel
 
-PHONY += qemu-kernel
+all-c: qemu-c-kernel
+
+PHONY += qemu-kernel qemu-c-kernel
 
 qemu-kernel: hos.kernel
 	qemu-system-i386 -nographic -curses -kernel $^
 	# qemu-system-i386 -kernel $^ -s -S
+	
+qemu-c-kernel: hos.c.kernel
+	qemu-system-i386 -nographic -curses -serial file:c.kernel.log -kernel $^
+	# qemu-system-i386 -nographic -curses -s -S -serial file:c.kernel.log -kernel $^
+	# qemu-system-i386 -kernel $^ -s -S -serial file:c.kernel.log
 
-hos.kernel: arch/$(ARCH)/linker.ld $(RS_KERNEL_LIB) $(KERNEL_OBJS) $(ARCH_OBJS) $(ARCH_ASMOBJS) $(CRTS)
-	$(CC) -T arch/$(ARCH)/linker.ld $(K_CFLAGS) -nostdlib -o $@ $(ARCH_OBJS) $(ARCH_ASMOBJS) $(CRTS) $(KERNEL_OBJS) $(RS_KERNEL_LIB)
+hos.c.kernel: $(KERNEL_LINKERLD) $(KERNEL_OBJS) $(ARCH_OBJS)
+	$(CC) -T $(KERNEL_LINKERLD) $(K_LDFLAGS) -o $@ $(ARCH_OBJS) $(KERNEL_OBJS)
 
-kernel/sys/version.o: ${KERNEL_SRCS}
+hos.kernel: $(KERNEL_LINKERLD) $(ARCH_OBJS) $(CRTS)
+	$(CC) -T $(KERNEL_LINKERLD) $(K_CFLAGS) -nostdlib -o $@ $(ARCH_OBJS) $(CRTS) $(RS_KERNEL_LIB)
 
-kernel/%.o: kernel/%.S
-	${CC} $(K_CFLAGS) -c $< -o $@ 
+$(SRC)/kernel/sys/version.o: ${KERNEL_SRCS}
 
-arch/%.o: arch/%.S
-	${CC} $(K_CFLAGS) -c $< -o $@ 
+$(SRC)/kernel/%.o: $(SRC)/kernel/%.S
+	${AS} $< -o $@ 
+	# ${CC} $(K_CFLAGS) -c $< -o $@ 
 
-KERNEL_HDRS  = $(wildcard include/kernel/*.h)
-KERNEL_HDRS += $(wildcard include/kernel/*/*.h)
+$(SRC)/arch/%.o: $(SRC)/arch/%.S
+	${AS} $< -o $@ 
+	# ${CC} $(K_CFLAGS) -c $< -o $@ 
 
-HEADERS = $(wildcard include/*.h)
-
-kernel/%.o: kernel/%.c ${KERNEL_HDRS}
+$(SRC)/kernel/%.o: $(SRC)/kernel/%.c ${KERNEL_HDRS} ${ARCH_HDRS}
 	${CC} ${K_CFLAGS} -nostdlib -Iinclude -c -o $@ $<
 
-arch/%.o: arch/%.c ${KERNEL_HDRS}
+$(SRC)/arch/%.o: $(SRC)/arch/%.c ${KERNEL_HDRS} ${ARCH_HDRS}
 	${CC} ${K_CFLAGS} -nostdlib -Iinclude -c -o $@ $<
 
 $(RUST_LIB_DIR)/%.a: ${RS_KERNEL_SRCS}
@@ -139,7 +143,6 @@ clean:
 	-rm -f ${KERNEL_ASMOBJS}
 	-rm -f ${KERNEL_OBJS} $(MODULES)
 	-rm -f ${ARCH_OBJS}
-	-rm -f ${ARCH_ASMOBJS}
 	-rm -f kernel/symbols.o kernel/symbols.S misaka-kernel misaka-kernel.64
 	-rm -f ramdisk.tar ramdisk.igz 
 	-rm -f $(APPS_Y) $(LIBS_Y) $(KRK_MODS_Y) $(KRK_MODS)
@@ -151,16 +154,18 @@ clean:
 	-rm -f $(GCC_SHARED)
 	-rm -f boot/efi/*.o boot/bios/*.o
 	-$(CARGO) clean
+	-rm -f hos.c.kernel
+	-rm -f hos.kernel
 
 $(BASE)/lib/ld.so: linker/linker.c $(BASE)/lib/libc.a | dirs $(LIBC)
 	$(CC) -g -static -Wl,-static $(CFLAGS) -z max-page-size=0x1000 -o $@ -Os -T linker/link.ld $<
 
-libc/%.o: libc/%.c base/usr/include/syscall.h 
+$(SRC)/libc/%.o: $(SRC)/libc/%.c base/usr/include/syscall.h 
 	$(CC) -O2 -std=gnu11 -ffreestanding -Wall -Wextra -Wno-unused-parameter -fPIC -c -o $@ $<
 
 PHONY += libc
 
-libc: $(BASE)/lib/libc.a $(BASE)/lib/libc.so
+$(SRC)/libc: $(BASE)/lib/libc.a $(BASE)/lib/libc.so
 
 $(BASE)/lib/libc.a: ${LIBC_OBJS} $(CRTS)
 	$(AR) cr $@ $(LIBC_OBJS)
@@ -170,7 +175,7 @@ $(BASE)/lib/libc.so: ${LIBC_OBJS} | $(CRTS)
 
 $(BASE)/lib/crt%.o: libc/arch/${ARCH}/crt%.o
 
-libc/arch/${ARCH}/crt%.o: libc/arch/${ARCH}/crt%.S
+$(SRC)/libc/arch/${ARCH}/crt%.o: $(SRC)/libc/arch/${ARCH}/crt%.S
 	${CC} -c $< -o $@ 
 
 $(BASE)/usr/lib/%: $(TOOLCHAIN)/local/${TARGET}/lib/% | dirs
@@ -227,8 +232,8 @@ libs: $(LIBS_X)
 PHONY += apps
 apps: $(APPS_X)
 
-SOURCE_FILES  = $(wildcard kernel/*.c kernel/*/*.c kernel/*/*/*.c kernel/*/*/*/*.c)
-SOURCE_FILES += $(wildcard apps/*.c linker/*.c libc/*.c libc/*/*.c lib/*.c)
+SOURCE_FILES  = $(wildcard $(SRC)/kernel/*.c $(SRC)/kernel/*/*.c $(SRC)/kernel/*/*/*.c $(SRC)/kernel/*/*/*/*.c)
+SOURCE_FILES += $(wildcard $(SRC)/apps/*.c $(SRC)/linker/*.c $(SRC)/libc/*.c $(SRC)/libc/*/*.c $(SRC)/lib/*.c)
 SOURCE_FILES += $(wildcard $(BASE)/usr/include/*.h $(BASE)/usr/include/*/*.h $(BASE)/usr/include/*/*/*.h)
 
 tags: $(SOURCE_FILES)

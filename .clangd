@@ -1,0 +1,8 @@
+If:                               # Apply this config conditionally
+  PathMatch: .*/.h                # to all headers...
+  PathExclude: include/llvm-c/.*  # except those under include/llvm-c/
+
+CompileFlags:                     # Tweak the parse settings
+  Add: [-Iinclude, -ffreestanding, -O2, -lgcc]
+  Remove: -W*                     # strip all other warning-related flags
+  Compiler: i686-elf-gcc          # Change argv[0] of compile flags to `clang++`

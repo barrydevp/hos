@@ -1,0 +1,9 @@
+-Iinclude
+-ffreestanding
+-O2
+-lgcc
+-Wall
+-Wextra
+-Wno-unused-function
+-Wno-unused-parameter
+-Wwrite-strings
