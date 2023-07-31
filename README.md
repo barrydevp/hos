@@ -79,8 +79,12 @@ make install-target-libgcc
 
 [Operating system from 0 to 1](https://github.com/tuhdo/os01)
 
+[Dreamos82 Osdev-Notes](https://github.com/dreamos82/Osdev-Notes)
+
 ### Some other Kernel - OS
 
 [toaruos](https://github.com/klange/toaruos)
 
 [mquy/mos](https://github.com/MQuy/mos)
+
+[Dreamos64](https://github.com/dreamos82/Dreamos64)
