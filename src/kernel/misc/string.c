@@ -3,149 +3,135 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define BITOP(A, B, OP)                                    \
-	((A)[(size_t)(B) / (8 * sizeof *(A))] OP(size_t) 1 \
-	 << ((size_t)(B) % (8 * sizeof *(A))))
+#define BITOP(A, B, OP)                              \
+  ((A)[(size_t)(B) / (8 * sizeof *(A))] OP(size_t) 1 \
+   << ((size_t)(B) % (8 * sizeof *(A))))
 
-unsigned short *memsetw(unsigned short *dest, unsigned short val, int count)
-{
-	int i = 0;
-	for (; i < count; ++i) {
-		dest[i] = val;
-	}
-	return dest;
+unsigned short *memsetw(unsigned short *dest, unsigned short val, int count) {
+  int i = 0;
+  for (; i < count; ++i) {
+    dest[i] = val;
+  }
+  return dest;
 }
 
 #if 1
-void *memcpy(void *restrict dest, const void *restrict src, size_t n)
-{
-	uint64_t *d_64 = dest;
-	const uint64_t *s_64 = src;
+void *memcpy(void *restrict dest, const void *restrict src, size_t n) {
+  uint64_t *d_64 = dest;
+  const uint64_t *s_64 = src;
 
-	for (; n >= 8; n -= 8) {
-		*d_64++ = *s_64++;
-	}
+  for (; n >= 8; n -= 8) {
+    *d_64++ = *s_64++;
+  }
 
-	uint32_t *d_32 = (void *)d_64;
-	const uint32_t *s_32 = (const void *)s_64;
+  uint32_t *d_32 = (void *)d_64;
+  const uint32_t *s_32 = (const void *)s_64;
 
-	for (; n >= 4; n -= 4) {
-		*d_32++ = *s_32++;
-	}
+  for (; n >= 4; n -= 4) {
+    *d_32++ = *s_32++;
+  }
 
-	uint8_t *d = (void *)d_32;
-	const uint8_t *s = (const void *)s_32;
+  uint8_t *d = (void *)d_32;
+  const uint8_t *s = (const void *)s_32;
 
-	for (; n > 0; n--) {
-		*d++ = *s++;
-	}
+  for (; n > 0; n--) {
+    *d++ = *s++;
+  }
 
-	return dest;
+  return dest;
 }
 #else
 /* FIXME why is there an x86-specific memcpy outside of the arch dir... */
-void *memcpy(void *restrict dest, const void *restrict src, size_t n)
-{
-	asm volatile("rep movsb"
-		     :
-		     : "D"(dest), "S"(src), "c"(n)
-		     : "flags", "memory");
-	return dest;
+void *memcpy(void *restrict dest, const void *restrict src, size_t n) {
+  asm volatile("rep movsb" : : "D"(dest), "S"(src), "c"(n) : "flags", "memory");
+  return dest;
 }
 #endif
 
-void *memset(void *dest, int c, size_t n)
-{
-	size_t i = 0;
-	for (; i < n; ++i) {
-		((char *)dest)[i] = c;
-	}
-	return dest;
+void *memset(void *dest, int c, size_t n) {
+  size_t i = 0;
+  for (; i < n; ++i) {
+    ((char *)dest)[i] = c;
+  }
+  return dest;
 }
 
-void *memmove(void *dest, const void *src, size_t n)
-{
-	char *d = dest;
-	const char *s = src;
+void *memmove(void *dest, const void *src, size_t n) {
+  char *d = dest;
+  const char *s = src;
 
-	if (d == s) {
-		return d;
-	}
+  if (d == s) {
+    return d;
+  }
 
-	if (s + n <= d || d + n <= s) {
-		return memcpy(d, s, n);
-	}
+  if (s + n <= d || d + n <= s) {
+    return memcpy(d, s, n);
+  }
 
-	if (d < s) {
-		if ((uintptr_t)s % sizeof(size_t) ==
-		    (uintptr_t)d % sizeof(size_t)) {
-			while ((uintptr_t)d % sizeof(size_t)) {
-				if (!n--) {
-					return dest;
-				}
-				*d++ = *s++;
-			}
-			for (; n >= sizeof(size_t); n -= sizeof(size_t),
-						    d += sizeof(size_t),
-						    s += sizeof(size_t)) {
-				*(size_t *)d = *(size_t *)s;
-			}
-		}
-		for (; n; n--) {
-			*d++ = *s++;
-		}
-	} else {
-		if ((uintptr_t)s % sizeof(size_t) ==
-		    (uintptr_t)d % sizeof(size_t)) {
-			while ((uintptr_t)(d + n) % sizeof(size_t)) {
-				if (!n--) {
-					return dest;
-				}
-				d[n] = s[n];
-			}
-			while (n >= sizeof(size_t)) {
-				n -= sizeof(size_t);
-				*(size_t *)(d + n) = *(size_t *)(s + n);
-			}
-		}
-		while (n) {
-			n--;
-			d[n] = s[n];
-		}
-	}
+  if (d < s) {
+    if ((uintptr_t)s % sizeof(size_t) == (uintptr_t)d % sizeof(size_t)) {
+      while ((uintptr_t)d % sizeof(size_t)) {
+        if (!n--) {
+          return dest;
+        }
+        *d++ = *s++;
+      }
+      for (; n >= sizeof(size_t);
+           n -= sizeof(size_t), d += sizeof(size_t), s += sizeof(size_t)) {
+        *(size_t *)d = *(size_t *)s;
+      }
+    }
+    for (; n; n--) {
+      *d++ = *s++;
+    }
+  } else {
+    if ((uintptr_t)s % sizeof(size_t) == (uintptr_t)d % sizeof(size_t)) {
+      while ((uintptr_t)(d + n) % sizeof(size_t)) {
+        if (!n--) {
+          return dest;
+        }
+        d[n] = s[n];
+      }
+      while (n >= sizeof(size_t)) {
+        n -= sizeof(size_t);
+        *(size_t *)(d + n) = *(size_t *)(s + n);
+      }
+    }
+    while (n) {
+      n--;
+      d[n] = s[n];
+    }
+  }
 
-	return dest;
+  return dest;
 }
 
-void *memchr(const void *src, int c, size_t n)
-{
-	const unsigned char *s = src;
-	c = (unsigned char)c;
-	for (; ((uintptr_t)s & (ALIGN - 1)) && n && *s != c; s++, n--)
-		;
-	if (n && *s != c) {
-		const size_t *w;
-		size_t k = ONES * c;
-		for (w = (const void *)s;
-		     n >= sizeof(size_t) && !HASZERO(*w ^ k);
-		     w++, n -= sizeof(size_t))
-			;
-		for (s = (const void *)w; n && *s != c; s++, n--)
-			;
-	}
-	return n ? (void *)s : 0;
+void *memchr(const void *src, int c, size_t n) {
+  const unsigned char *s = src;
+  c = (unsigned char)c;
+  for (; ((uintptr_t)s & (ALIGN - 1)) && n && *s != c; s++, n--)
+    ;
+  if (n && *s != c) {
+    const size_t *w;
+    size_t k = ONES * c;
+    for (w = (const void *)s; n >= sizeof(size_t) && !HASZERO(*w ^ k);
+         w++, n -= sizeof(size_t))
+      ;
+    for (s = (const void *)w; n && *s != c; s++, n--)
+      ;
+  }
+  return n ? (void *)s : 0;
 }
 
-void *memrchr(const void *m, int c, size_t n)
-{
-	const unsigned char *s = m;
-	c = (unsigned char)c;
-	while (n--) {
-		if (s[n] == c) {
-			return (void *)(s + n);
-		}
-	}
-	return 0;
+void *memrchr(const void *m, int c, size_t n) {
+  const unsigned char *s = m;
+  c = (unsigned char)c;
+  while (n--) {
+    if (s[n] == c) {
+      return (void *)(s + n);
+    }
+  }
+  return 0;
 }
 
 // size_t strlen(const char *s)

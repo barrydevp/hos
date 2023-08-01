@@ -1,10 +1,13 @@
 #include <arch/i386/boot/gdt.h>
+#include <arch/i386/boot/irq.h>
 #include <kernel/kernel.h>
 
-int kenter(void)
-{
-	gdt_init();
+int kenter(void) {
+  gdt_init();
+  idt_init();
 
-	/* give control to the real kernel main */
-	return kmain();
+  asm volatile("int $34");
+
+  /* give control to the real kernel main */
+  return kmain();
 }

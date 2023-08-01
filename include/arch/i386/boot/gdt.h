@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdint.h>
+#include <kernel/types.h>
 
 //! maximum amount of descriptors allowed
 #define MAX_DESCRIPTORS 6

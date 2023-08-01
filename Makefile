@@ -103,16 +103,21 @@ all: qemu-kernel
 
 all-c: qemu-c-kernel
 
-PHONY += qemu-kernel qemu-c-kernel
+all-cd: qemu-c-kernel-debug
+
+PHONY += qemu-kernel qemu-c-kernel qemu-c-kernel-debug
 
 qemu-kernel: hos.kernel
 	qemu-system-i386 -nographic -curses -kernel $^
 	# qemu-system-i386 -kernel $^ -s -S
-	
+
 qemu-c-kernel: hos.c.kernel
 	qemu-system-i386 -nographic -curses -serial file:c.kernel.log -kernel $^
 	# qemu-system-i386 -nographic -curses -s -S -serial file:c.kernel.log -kernel $^
 	# qemu-system-i386 -kernel $^ -s -S -serial file:c.kernel.log
+
+qemu-c-kernel-debug: hos.c.kernel
+	qemu-system-i386 -nographic -curses -s -S -serial file:c.kernel.log -kernel $^
 
 hos.c.kernel: $(KERNEL_LINKERLD) $(KERNEL_OBJS) $(ARCH_OBJS)
 	$(CC) -T $(KERNEL_LINKERLD) $(K_LDFLAGS) -o $@ $(ARCH_OBJS) $(KERNEL_OBJS)
