@@ -8,5 +8,8 @@ int kmain() {
   char *video_memory = (char *)0xC03FF000;
   *video_memory = 'H';
 
+  for (;;) {
+  }
+
   return 0;
 }

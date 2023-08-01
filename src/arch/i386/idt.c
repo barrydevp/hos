@@ -1,5 +1,6 @@
-#include <arch/i386/boot/irq.h>
-#include <arch/i386/boot/ports.h>
+#include <arch/i386/irq.h>
+#include <arch/i386/ports.h>
+#include <arch/i386/pic.h>
 #include <kernel/string.h>
 
 extern void idt_load(uint32_t);
@@ -9,6 +10,10 @@ static struct idtr idtr;
 
 // array of function pointers to handle each interrupt
 static I86_IRQ_HANDLER isr_handlers[I86_MAX_INTERRUPTS];
+
+void isr_install_handler(uint32_t index, I86_IRQ_HANDLER handler) {
+  isr_handlers[index] = handler;
+}
 
 /**
  * @brief Initialize a gate, since there's some address swizzling involved...
@@ -51,7 +56,7 @@ void idt_init() {
   /** ISRs
    *  0x08 = address of Code Segment in GDT
    *  0x8E = I86_IDT_DESC_PRESENT | I86_IDT_DESC_BIT32
-   *	because it's too long for one line so I use 0x8E instead */
+   *  because it's too long for one line so I use 0x8E instead */
   idt_set_gate(0, isr0, 0x08, 0x8E);
   idt_set_gate(1, isr1, 0x08, 0x8E);
   idt_set_gate(2, isr2, 0x08, 0x8E);
@@ -161,10 +166,16 @@ static void _exception(struct interrupt_regs *r, const char *description) {
  */
 static void _handle_irq(struct interrupt_regs *r, uint32_t irq) {
   // for (size_t i = 0; i < IRQ_CHAIN_DEPTH; i++) {
-  // 	irq_handler_chain_t handler = irq_routines[i * IRQ_CHAIN_SIZE + irq];
-  // 	if (!handler) break;
-  // 	if (handler(r)) return;
+  //   I86_IRQ_HANDLER handler = irq_routines[i * IRQ_CHAIN_SIZE + irq];
+  //   if (!handler)
+  //     break;
+  //   if (handler(r))
+  //     return;
   // }
+
+  I86_IRQ_HANDLER handler = isr_handlers[irq];
+  if (handler(r) == IRQ_CONTINUE)
+    return;
 
   /* Unhandled */
   irq_ack(irq);
@@ -181,56 +192,56 @@ void isr_handler_inner(struct interrupt_regs *r) {
     EXC(0, "divide-by-zero");
     case 1:
       // return _debug_int(r);
-		/* NMI doesn't reach here, we use it as a panic signal. */
-		EXC(3, "breakpoint"); /* TODO: This should map to a ptrace event */
-		EXC(4, "overflow");
-		EXC(5, "bound range exceeded");
-		EXC(6, "invalid opcode");
-		EXC(7, "device not available");
+    /* NMI doesn't reach here, we use it as a panic signal. */
+    EXC(3, "breakpoint"); /* TODO: This should map to a ptrace event */
+    EXC(4, "overflow");
+    EXC(5, "bound range exceeded");
+    EXC(6, "invalid opcode");
+    EXC(7, "device not available");
     case 8:
       _double_fault(r);
       break;
-		/* 9 is a legacy exception that shouldn't happen */
-		EXC(10, "invalid TSS");
-		EXC(11, "segment not present");
-		EXC(12, "stack-segment fault");
+    /* 9 is a legacy exception that shouldn't happen */
+    EXC(10, "invalid TSS");
+    EXC(11, "segment not present");
+    EXC(12, "stack-segment fault");
     case 13:
       _general_protection_fault(r);
       break;
     case 14:
       // _page_fault(r);
       break;
-		/* 15 is reserved */
-		EXC(16, "floating point exception");
-		EXC(17, "alignment check");
-		EXC(18, "machine check");
-		EXC(19, "SIMD floating-point exception");
-		EXC(20, "virtualization exception");
-		EXC(21, "control protection exception");
-		/* 22 through 27 are reserved */
-		EXC(28, "hypervisor injection exception");
-		EXC(29, "VMM communication exception");
-		EXC(30, "security exception");
-		/* 31 is reserved */
+    /* 15 is reserved */
+    EXC(16, "floating point exception");
+    EXC(17, "alignment check");
+    EXC(18, "machine check");
+    EXC(19, "SIMD floating-point exception");
+    EXC(20, "virtualization exception");
+    EXC(21, "control protection exception");
+    /* 22 through 27 are reserved */
+    EXC(28, "hypervisor injection exception");
+    EXC(29, "VMM communication exception");
+    EXC(30, "security exception");
+    /* 31 is reserved */
 
-		/* 16 IRQs that go to the general IRQ chain */
-		IRQ(32);
-		IRQ(33);
-		IRQ(34);
-		IRQ(35);
-		IRQ(36);
-		IRQ(37);
-		IRQ(38);
+    /* 16 IRQs that go to the general IRQ chain */
+    IRQ(32);
+    IRQ(33);
+    IRQ(34);
+    IRQ(35);
+    IRQ(36);
+    IRQ(37);
+    IRQ(38);
     case 39:
       break; /* Except the spurious IRQ, just ignore that */
-		IRQ(40);
-		IRQ(41);
-		IRQ(42);
-		IRQ(43);
-		IRQ(44);
-		IRQ(45);
-		IRQ(46);
-		IRQ(47);
+    IRQ(40);
+    IRQ(41);
+    IRQ(42);
+    IRQ(43);
+    IRQ(44);
+    IRQ(45);
+    IRQ(46);
+    IRQ(47);
 
     /* Local interrupts that make it here. */
     case 123:
@@ -266,7 +277,7 @@ void isr_handler(struct interrupt_regs *r) {
 }
 
 void irq_ack(uint32_t irq_number) {
-  // if (irq_number >= 8)
-  // 	outportb(PIC2_COMMAND, PIC_EOI);
-  // outportb(PIC1_COMMAND, PIC_EOI);
+  if (irq_number >= 8)
+    outportb(PIC2_COMMAND, PIC_EOI);
+  outportb(PIC1_COMMAND, PIC_EOI);
 }

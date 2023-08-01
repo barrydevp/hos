@@ -1,4 +1,4 @@
-#include <arch/i386/boot/gdt.h>
+#include <arch/i386/gdt.h>
 #include <kernel/string.h>
 
 static struct gdt_descriptor gdt[MAX_DESCRIPTORS]; // 3 descriptors

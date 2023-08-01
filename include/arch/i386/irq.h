@@ -1,7 +1,7 @@
 #pragma once
 
 #include <kernel/types.h>
-#include <arch/i386/boot/regs.h>
+#include <arch/i386/regs.h>
 
 //! i86 defines 256 possible interrupt handlers (0-255)
 #define I86_MAX_INTERRUPTS 256
@@ -29,13 +29,14 @@ struct __attribute__((packed)) idtr {
 	uint32_t base;
 };
 
-#define IRQ_HANDLER_CONTINUE 0
-#define IRQ_HANDLER_STOP 1
+#define IRQ_CONTINUE 0
+#define IRQ_STOP 1
+
 typedef void (*I86_IVT)(struct interrupt_regs *regs);
 typedef int32_t (*I86_IRQ_HANDLER)(struct interrupt_regs *registers);
 
 void idt_init();
-void register_interrupt_handler(uint32_t n, I86_IRQ_HANDLER handler);
+void isr_install_handler(uint32_t index, I86_IRQ_HANDLER handler);
 
 /* ISRs reserved for CPU exceptions */
 extern void isr0();
