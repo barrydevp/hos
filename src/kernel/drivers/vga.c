@@ -191,63 +191,6 @@ void vga_puts(char *str) {
   }
 }
 
-// int vga_printf(const char *str, ...) {
-//   va_list list;
-//   va_start(list, str);
-//
-//   for (size_t i = 0; i < strlen(str); i++) {
-//     switch (str[i]) {
-//       case '%': {
-//         switch (str[i + 1]) {
-//           case 'c': {
-//             char c = va_arg(list, char);
-//             vga_putc(c);
-//             i++;
-//             break;
-//           }
-//           case 's': {
-//             char *input = va_arg(list, char *);
-//             vga_puts(input);
-//             i++;
-//             break;
-//           }
-//           case 'd':
-//           case 'i': {
-//             int32_t integer = va_arg(list, int32_t);
-//             char buf[32] = { 0 };
-//             itoa(integer, buf, 10);
-//             vga_puts(buf);
-//             i++;
-//             break;
-//           }
-//           case 'x':
-//           case 'X': {
-//             uint32_t integer = va_arg(list, uint32_t);
-//             char buf[32] = { 0 };
-//             itoa_u(integer, buf, 16);
-//             vga_puts(buf);
-//             i++;
-//             break;
-//           }
-//           default: {
-//             vga_putc(str[i]);
-//             i++;
-//             break;
-//           }
-//         }
-//         break;
-//       }
-//       default: {
-//         vga_putc(str[i]);
-//         break;
-//       }
-//     }
-//   }
-//
-//   va_end(list);
-//   return 1;
-// }
-
 void vga_set_color(const uint8_t color) {
   screen_color = color;
 }

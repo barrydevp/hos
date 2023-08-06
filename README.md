@@ -65,6 +65,8 @@ make all-target-libgcc
 make install-gcc
 make install-target-libgcc
 
+# grub toolchains
+sudo apt install grub-pc-bin xorriso mtools
 
 ```
 

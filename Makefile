@@ -111,13 +111,25 @@ qemu-kernel: hos.kernel
 	qemu-system-i386 -nographic -curses -kernel $^
 	# qemu-system-i386 -kernel $^ -s -S
 
-qemu-c-kernel: hos.c.kernel
-	qemu-system-i386 -nographic -curses -serial file:c.kernel.log -kernel $^
+qemu-c-kernel: hos.iso
+	# qemu-system-i386 -nographic -curses -serial file:c.kernel.log -kernel $^
+	qemu-system-i386 -nographic -curses -cdrom $^
 	# qemu-system-i386 -nographic -curses -s -S -serial file:c.kernel.log -kernel $^
 	# qemu-system-i386 -kernel $^ -s -S -serial file:c.kernel.log
 
-qemu-c-kernel-debug: hos.c.kernel
-	qemu-system-i386 -nographic -curses -s -S -serial file:c.kernel.log -kernel $^
+qemu-c-kernel-debug: hos.iso
+	# qemu-system-i386 -nographic -curses -s -S -serial file:c.kernel.log -kernel $^
+	qemu-system-i386 -nographic -curses -s -S -serial file:c.kernel.log -cdrom $^
+
+PHONY += hos.bin
+
+hos.iso: hos.bin
+	-cp multiboot/grub.cfg isodir/boot/grub/grub.cfg
+	-grub-mkrescue -o hos.iso isodir
+
+hos.bin: hos.c.kernel
+	-mkdir -p isodir/boot/grub
+	-cp hos.c.kernel isodir/boot/hos.bin
 
 hos.c.kernel: $(KERNEL_LINKERLD) $(KERNEL_OBJS) $(ARCH_OBJS)
 	$(CC) -T $(KERNEL_LINKERLD) $(K_LDFLAGS) -o $@ $(ARCH_OBJS) $(KERNEL_OBJS)
@@ -161,6 +173,8 @@ clean:
 	-$(CARGO) clean
 	-rm -f hos.c.kernel
 	-rm -f hos.kernel
+	-rm -rf isodir
+	-rm -f hos.iso
 
 $(BASE)/lib/ld.so: linker/linker.c $(BASE)/lib/libc.a | dirs $(LIBC)
 	$(CC) -g -static -Wl,-static $(CFLAGS) -z max-page-size=0x1000 -o $@ -Os -T linker/link.ld $<

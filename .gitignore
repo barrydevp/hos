@@ -6,5 +6,7 @@
 *.bin
 *.elf
 *.log
+*.iso
 /target
 Cargo.lock
+isodir

@@ -39,7 +39,6 @@ inline void vga_backspace();
 inline void vga_newline();
 inline void vga_tab();
 void vga_puts(char *str);
-// int vga_printf(const char *str, ...);
 
 void vga_set_color(const uint8_t color);
 void vga_goto_xy(const uint8_t x, const uint8_t y);

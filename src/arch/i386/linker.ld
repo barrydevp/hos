@@ -2,7 +2,7 @@ ENTRY (_start)
 
 SECTIONS
 {
-	. = 0x00100000;
+	. = 1M;
 	/* The kernel will live at 3GB + 1MB in the virtual address space, */
 	/* which will be mapped to 1MB in the physical address space. */
 	/* Note that we page-align the sections. */
@@ -20,6 +20,7 @@ SECTIONS
 	/* Add a symbol that indicates the start address of the kernel. */
 	.text ALIGN (4K) : AT (ADDR (.text) - 0xC0000000)
 	{
+		code = .;
 		*(.text)
 	}
 	.rodata ALIGN (4K) : AT (ADDR (.rodata) - 0xC0000000)
@@ -28,7 +29,12 @@ SECTIONS
 	}
 	.data ALIGN (4K) : AT (ADDR (.data) - 0xC0000000)
 	{
+		data = .;
 		*(.data)
+		*(.symbols)
+		PROVIDE(kernel_symbols_start = .);
+		PROVIDE(kernel_symbols_end = .);
+		PROVIDE(bss_start = .);
 	}
 	.bss ALIGN (4K) : AT (ADDR (.bss) - 0xC0000000)
 	{
