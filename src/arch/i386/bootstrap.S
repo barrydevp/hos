@@ -47,10 +47,25 @@ _start:
 	# Map 1023 pages. The 1024th will be the VGA text buffer.
 	movl $1023, %ecx
 
+# en_paging:
+# 	# Indentity mapping (1MB)
+# 	mov	$256, %ecx # loop 256 times -> 1MB / 4KB each
+# 
+# _loop:
+# 	movl %esi, %edx
+# 	orl $0x003, %edx
+# 	movl %edx, (%edi)
+# 	# Size of page is 4096 bytes.
+# 	addl $4096, %esi
+# 	# Size of entries in boot_page_table1 is 4 bytes.
+# 	addl $4, %edi
+# 	# Loop to the next entry if we haven't finished.
+# 	loop _loop
+
 1:
-	# Only map the kernel.
-	cmpl $_kernel_start, %esi
-	jl 2f
+	# Kernel map from 1MB
+#	cmpl $_kernel_start, %esi
+#	jl 2f
 	cmpl $(_kernel_end - 0xC0000000), %esi
 	jge 3f
 
@@ -102,7 +117,7 @@ _start:
 	# At this point, paging is fully set up and enabled.
 
 	# Unmap the identity mapping as it is now unnecessary. 
-	movl $0, boot_page_directory + 0
+	# movl $0, boot_page_directory + 0
 
 	# Reload crc3 to force a TLB flush so the changes to take effect.
 	movl %cr3, %ecx

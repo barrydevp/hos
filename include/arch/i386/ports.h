@@ -1,3 +1,5 @@
+#pragma once
+
 #include <kernel/types.h>
 
 static inline unsigned char inportb(unsigned short _port) {

@@ -3,6 +3,7 @@
 #include <kernel/types.h>
 
 static inline void io_wait() {
+  /* https://stackoverflow.com/questions/6793899/what-does-the-0x80-port-address-connect-to */
   /* Port 0x80 is used for 'checkpoints' during POST. */
   /* The Linux kernel seems to think it is free for use :-/ */
   asm volatile("outb %%al, $0x80" : : "a"(0));

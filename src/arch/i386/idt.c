@@ -2,6 +2,7 @@
 #include <arch/i386/ports.h>
 #include <arch/i386/pic.h>
 #include <kernel/string.h>
+#include <kernel/printf.h>
 
 extern void idt_load(uint32_t);
 
@@ -114,6 +115,49 @@ void idt_init() {
 
 static void panic(const char *desc, struct interrupt_regs *r,
                   uint32_t faulting_address) {
+  /* Stop all other cores */
+  // arch_fatal_prepare();
+  //
+  /* Print the description, current process, cause */
+  // dprintf("\033[31mPanic!\033[0m %s pid=%d (%s) at %#zx\n", desc,
+  //         this_core->current_process ? (int)this_core->current_process->id : 0,
+  //         this_core->current_process ? this_core->current_process->name :
+  //                                      "kernel",
+  //         faulting_address);
+
+  /* Dump register state */
+  // dprintf(
+  //   "Registers at interrupt:\n"
+  //   "  $eip=0x%016lx\n"
+  //   "  $esi=0x%016lx,$edi=0x%016lx,$ebp=0x%016lx,$esp=0x%016lx\n"
+  //   "  $eax=0x%016lx,$ebx=0x%016lx,$ecx=0x%016lx,$edx=0x%016lx\n"
+  //   "  $gs= 0x%016lx,$fs= 0x%016lx,$es=0x%016lx,$ds=0x%016lx\n"
+  //   "  cs=0x%016lx  ss=0x%016lx eflags=0x%016lx int=0x%02lx err=0x%02lx\n",
+  //   r->eip, r->esi, r->edi, r->ebp, r->esp, r->eax, r->ebx, r->ecx, r->edx,
+  //   r->gs, r->fs, r->es, r->ds, r->cs, r->ss, r->eflags, r->int_no,
+  //   r->err_code);
+
+  // /* Dump GS segment register information */
+  // uint32_t gs_base_low, gs_base_high;
+  // asm volatile("rdmsr"
+  //              : "=a"(gs_base_low), "=d"(gs_base_high)
+  //              : "c"(0xc0000101));
+  // uint32_t kgs_base_low, kgs_base_high;
+  // asm volatile("rdmsr"
+  //              : "=a"(kgs_base_low), "=d"(kgs_base_high)
+  //              : "c"(0xc0000102));
+  // dprintf("  gs=0x%08x%08x kgs=0x%08x%08x\n", gs_base_high, gs_base_low,
+  //         kgs_base_high, kgs_base_low);
+  //
+  // /* Walk the call stack from before the interrupt */
+  // safe_dump_traceback(r);
+  //
+  // /* Stop this core */
+  // arch_fatal();
+
+  dprintf("Panic! (");
+  dprintf(desc);
+  dprintf(")\n");
 }
 
 /**
@@ -153,6 +197,9 @@ static void _exception(struct interrupt_regs *r, const char *description) {
   // if (!this_core->current_process || r->cs == 0x08) {
   // 	panic(description, r, r->int_no);
   // }
+  if (r->cs == 0x08) {
+    panic(description, r, r->int_no);
+  }
   /* Otherwise, these interrupts should trigger SIGILL */
   // send_signal(this_core->current_process->id, SIGILL, 1);
 }

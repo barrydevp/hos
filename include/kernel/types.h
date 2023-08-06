@@ -3,6 +3,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <stdarg.h>
 
 #define asm __asm__
 #define volatile __volatile__

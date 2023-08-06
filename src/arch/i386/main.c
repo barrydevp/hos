@@ -3,6 +3,7 @@
 #include <arch/i386/pic.h>
 #include <arch/i386/pit.h>
 #include <arch/i386/cpu.h>
+#include <kernel/drivers/vga.h>
 #include <kernel/kernel.h>
 
 int kenter(void) {
@@ -10,6 +11,7 @@ int kenter(void) {
   idt_init();
   pic_init();
   pit_init();
+  vga_init();
 
   enable_interrupts();
 
