@@ -7,7 +7,8 @@ SECTIONS
 	/* which will be mapped to 1MB in the physical address space. */
 	/* Note that we page-align the sections. */
 
-	_kernel_start = .;
+	_kernel_boot = .;
+
 	.multiboot.data : {
 		*(.multiboot.data)
 	}
@@ -16,30 +17,36 @@ SECTIONS
 		*(.multiboot.text)
 	}
 
-	. += 0xC0000000;
+	_kernel_higher_half = 0xc0000000;
+
+	. += _kernel_higher_half;
+	_kernel_start = .;
+
 	/* Add a symbol that indicates the start address of the kernel. */
-	.text ALIGN (4K) : AT (ADDR (.text) - 0xC0000000)
+	.text ALIGN (4K) : AT (ADDR (.text) - _kernel_higher_half)
 	{
-		code = .;
+		_kernel_text_start = .;
 		*(.text)
+		_kernel_text_end = .;
 	}
-	.rodata ALIGN (4K) : AT (ADDR (.rodata) - 0xC0000000)
+	.rodata ALIGN (4K) : AT (ADDR (.rodata) - _kernel_higher_half)
 	{
-		*(.rodata)
+		*(.rodata .rodata.*)
 	}
-	.data ALIGN (4K) : AT (ADDR (.data) - 0xC0000000)
+	.data ALIGN (4K) : AT (ADDR (.data) - _kernel_higher_half)
 	{
-		data = .;
+		_kernel_data_start = .;
 		*(.data)
 		*(.symbols)
-		PROVIDE(kernel_symbols_start = .);
-		PROVIDE(kernel_symbols_end = .);
+		PROVIDE(_kernel_symbols_start = .);
+		PROVIDE(_kernel_symbols_end = .);
+		_kernel_data_end = .;
 		PROVIDE(bss_start = .);
 	}
-	.bss ALIGN (4K) : AT (ADDR (.bss) - 0xC0000000)
+	.bss ALIGN (4K) : AT (ADDR (.bss) - _kernel_higher_half)
 	{
 		*(COMMON)
-		*(.bss)
+		*(.bss .bss.*)
 		*(.bootstrap_stack)
 	}
 	/* Add a symbol that indicates the end address of the kernel. */

@@ -11,7 +11,8 @@ K_CFLAGS += -D_KERNEL_ -DKERNEL_ARCH=${ARCH}
 K_CFLAGS += -DKERNEL_GIT_TAG=0.0.0
 
 # LDFLAGS for kernel
-K_LDFLAGS  = -ffreestanding -O2 -nostdlib -lgcc
+# K_LDFLAGS  = -ffreestanding -O2 -nostdlib -lgcc
+K_LDFLAGS  = -ffreestanding -nostdlib -lgcc # debug purpose => turn off O2 optimization
 
 # These sources are used to determine if we should update symbols.o
 KERNEL_SRCS  = $(wildcard $(SRC)/kernel/*.c)
@@ -113,7 +114,7 @@ qemu-kernel: hos.kernel
 
 qemu-c-kernel: hos.iso
 	# qemu-system-i386 -nographic -curses -serial file:c.kernel.log -kernel $^
-	qemu-system-i386 -nographic -curses -cdrom $^
+	qemu-system-i386 -nographic -curses -serial file:c.kernel.log -cdrom $^
 	# qemu-system-i386 -nographic -curses -s -S -serial file:c.kernel.log -kernel $^
 	# qemu-system-i386 -kernel $^ -s -S -serial file:c.kernel.log
 
@@ -250,6 +251,17 @@ libs: $(LIBS_X)
 
 PHONY += apps
 apps: $(APPS_X)
+
+TESTFLAGS := -std=gnu99 \
+        -I tests/include \
+        -I include \
+        -DSMALL_PAGES=$(SMALL_PAGES) \
+        -D_TEST_=1
+
+PHONY += test
+test: 
+	gcc ${TESTFLAGS} $(TESTS)/kernel/memory.c $(SRC)/kernel/memory/pmm.c $(SRC)/kernel/multiboot.c -o tests/kernel/memory.test
+	./$(TESTS)/kernel/memory.test
 
 SOURCE_FILES  = $(wildcard $(SRC)/kernel/*.c $(SRC)/kernel/*/*.c $(SRC)/kernel/*/*/*.c $(SRC)/kernel/*/*/*/*.c)
 SOURCE_FILES += $(wildcard $(SRC)/apps/*.c $(SRC)/linker/*.c $(SRC)/libc/*.c $(SRC)/libc/*/*.c $(SRC)/lib/*.c)

@@ -40,7 +40,7 @@ static void idt_default_handler(struct interrupt_regs *regs) {
   // err("IDT: unhandled exception %d", int_no);
   //
   // halt();
-  int a = 1;
+  // int a = 1;
 }
 
 void idt_init() {
@@ -187,6 +187,51 @@ static void _general_protection_fault(struct interrupt_regs *r) {
 }
 
 /**
+ * @brief Page fault handler.
+ *
+ * Handles magic return addresses, stack expansions, maybe
+ * later will handle COW or mmap'd filed... otherwise,
+ * mostly segfaults.
+ *
+ * @param r Interrupt register context
+ */
+static void _page_fault(struct interrupt_regs *r) {
+  /* Obtain the "cause" address */
+  uintptr_t faulting_address;
+  asm volatile("mov %%cr2, %0" : "=r"(faulting_address));
+
+  // /* 8DEADBEEFh is the magic ret-from-sig address. */
+  // if (faulting_address == 0x8DEADBEEF) {
+  //   return_from_signal_handler(r);
+  //   return;
+  // }
+  //
+  // if ((r->err_code & 3) == 3) {
+  //   /* This is probably a COW page? */
+  //   extern int mmu_copy_on_write(uintptr_t address);
+  //   if (!mmu_copy_on_write(faulting_address))
+  //     return;
+  // }
+  //
+  // /* Was this a kernel page fault? Those are always a panic. */
+  // if (!this_core->current_process || r->cs == 0x08) {
+  //   panic("Page fault in kernel", r, faulting_address);
+  panic("Page fault in kernel", r, faulting_address);
+  // }
+  //
+  // /* Page was present but not writable */
+  //
+  // /* Quietly map more stack if it was a viable stack address. */
+  // if (faulting_address < 0x800000000000 && faulting_address > 0x700000000000) {
+  //   if (map_more_stack(faulting_address & 0xFFFFffffFFFFf000))
+  //     return;
+  // }
+  //
+  // /* Otherwise, segfault the current process. */
+  // send_signal(this_core->current_process->id, SIGSEGV, 1);
+}
+
+/**
  * @brief Handle an exception interrupt.
  *
  * @param r           Interrupt register context
@@ -256,7 +301,7 @@ void isr_handler_inner(struct interrupt_regs *r) {
       _general_protection_fault(r);
       break;
     case 14:
-      // _page_fault(r);
+      _page_fault(r);
       break;
     /* 15 is reserved */
     EXC(16, "floating point exception");

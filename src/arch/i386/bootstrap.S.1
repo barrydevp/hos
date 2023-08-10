@@ -47,7 +47,7 @@ mb2_tag_addr:
 .word 1
 .long 24
 .long multiboot2_header
-.long _kernel_boot                /* load_addr */
+.long _kernel_start               /* load_addr */
 .long bss_start - 0xC0000000      /* load_end_addr */
 .long _kernel_end - 0xC0000000    /* bss_end_addr */
 #
@@ -73,17 +73,17 @@ mb2_tag_fb:
 .long 600
 .long 32
 
-.align 8
-.word 4
-.word 1
-.long 12
-.long 2 /* We support EGA text, but don't require it */
-
-/* Modules must be aligned */
-.align 8
-.word 6
-.word 0
-.long 8
+#.align 8
+#.word 4
+#.word 1
+#.long 12
+#.long 2 /* We support EGA text, but don't require it */
+#
+#/* Modules must be aligned */
+#.align 8
+#.word 6
+#.word 0
+#.long 8
 
 /* End tag */
 mb2_tag_fb_end:
@@ -209,15 +209,15 @@ _start:
 	mov $stack_top, %esp
 
 	# Enter the high-level kernel.
+	/* Make sure our stack is 16-byte aligned */
+	and $-16, %esp
 	# push multiboot info
 #	pushl $0
 #	pushl %esp
 #	pushl $0
+	pushl %eax /* Multiboot header magic */
 #	pushl $0
 	pushl %ebx /* Multiboot header pointer */
-	pushl %eax /* Multiboot header magic */
-
-	# call kenerl entry point
 	call kenter
 
 	# Infinite loop if the system has nothing more to do.
