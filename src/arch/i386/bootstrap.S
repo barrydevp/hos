@@ -1,32 +1,8 @@
 # Declare a multiboot header that marks the program as a kernel.
 .section .multiboot.data, "aw"
 
-/* Multiboot 1 header */
-.set MB_MAGIC,              0x1BADB002
-.set MB_FLAG_PAGE_ALIGN,    1 << 0
-.set MB_FLAG_MEMORY_INFO,   1 << 1
-.set MB_FLAG_GRAPHICS,      1 << 2
-.set MB_FLAG_AOUT,          1 << 16
-.set MB_FLAGS,              MB_FLAG_PAGE_ALIGN | MB_FLAG_MEMORY_INFO | MB_FLAG_GRAPHICS | MB_FLAG_AOUT
-.set MB_CHECKSUM,           -(MB_MAGIC + MB_FLAGS)
-
-/* Multiboot section */
-# .align 4
-# multiboot_header:
-# .long MB_MAGIC
-# .long MB_FLAGS
-# .long MB_CHECKSUM
-# .long multiboot_header /* header_addr */
-# .long _kernel_start    /* load_addr */
-# .long bss_start        /* load_end_addr */
-# .long _kernel_end      /* bss_end_addr */
-# .long _start           /* entry_addr */
-# 
-# /* Request linear graphics mode */
-# .long 0x00000000
-# .long 1024
-# .long 768
-# .long 32
+/* global constant */
+.set KERNEL_HIGHER_HAFL, 0xC0000000
 
 /* Multiboot 2 header */
 .set MB2_MAGIC,    0xe85250d6
@@ -47,11 +23,11 @@ mb2_tag_addr:
 .word 1
 .long 24
 .long multiboot2_header
-.long _kernel_boot                /* load_addr */
+.long _bootloader_start           /* load_addr */
 .long bss_start - 0xC0000000      /* load_end_addr */
 .long _kernel_end - 0xC0000000    /* bss_end_addr */
-#
-#/* Entry tag */
+
+/* Entry tag */
 #.align 8
 mb2_tag_entry:
 .word 3
@@ -60,26 +36,27 @@ mb2_tag_entry:
 .long 12
 .long _start
 
+/* Flags tag */
+#.align 8
+#.word 4
+#.word 1
+#.long 12
+#.long 2 /* We support EGA text, but don't require it */
+
 /* Framebuffer tag */
-.align 8
-mb2_tag_fb:
-.word 5
-#.word 0
-.word 1
-.long 20
-#.long 1024
-#.long 768
-.long 800
-.long 600
-.long 32
+#.align 8
+#mb2_tag_fb:
+#.word 5
+##.word 0
+#.word 1
+#.long 20
+##.long 1024
+##.long 768
+#.long 800
+#.long 600
+#.long 32
 
-.align 8
-.word 4
-.word 1
-.long 12
-.long 2 /* We support EGA text, but don't require it */
-
-/* Modules must be aligned */
+/* Modules alignment tag */
 .align 8
 .word 6
 .word 0
@@ -116,86 +93,75 @@ boot_page_table1:
 .global _start
 .type _start, @function
 _start:
-	# Physical address of boot_page_table1.
-	# TODO: I recall seeing some assembly that used a macro to do the
-	#       conversions to and from physical. Maybe this should be done in this
-	#       code as well?
-	movl $(boot_page_table1 - 0xC0000000), %edi
-	# First address to map is address 0.
-	# TODO: Start at the first kernel page instead. Alternatively map the first
-	#       1 MiB as it can be generally useful, and there's no need to
-	#       specially map the VGA buffer.
-	movl $0, %esi
-	# Map 1023 pages. The 1024th will be the VGA text buffer.
-	movl $1023, %ecx
 
-# en_paging:
-# 	# Indentity mapping (1MB)
-# 	mov	$256, %ecx # loop 256 times -> 1MB / 4KB each
-# 
-# _loop:
-# 	movl %esi, %edx
-# 	orl $0x003, %edx
-# 	movl %edx, (%edi)
-# 	# Size of page is 4096 bytes.
-# 	addl $4096, %esi
-# 	# Size of entries in boot_page_table1 is 4 bytes.
-# 	addl $4, %edi
-# 	# Loop to the next entry if we haven't finished.
-# 	loop _loop
+	# Set up the stack.
+	mov $stack_top, %esp
+	/* Make sure our stack is 16-byte aligned */
+	and $-16, %esp
 
-1:
-	# Kernel map from 1MB
-#	cmpl $_kernel_start, %esi
-#	jl 2f
-	cmpl $(_kernel_end - 0xC0000000), %esi
-	jge 3f
+	/* Reset EFLAGS. */
+	pushl $0
+	popf
 
-	# Map physical address as "present, writable". Note that this maps
-	# .text and .rodata as writable. Mind security and map them as non-writable.
-	movl %esi, %edx
-	orl $0x003, %edx
-	movl %edx, (%edi)
+	# push multiboot info
+	pushl %ebx /* Multiboot header pointer */
+	pushl %eax /* Multiboot header magic */
 
-2:
-	# Size of page is 4096 bytes.
-	addl $4096, %esi
-	# Size of entries in boot_page_table1 is 4 bytes.
-	addl $4, %edi
-	# Loop to the next entry if we haven't finished.
-	loop 1b
 
-3:
-	# Map VGA video memory to 0xC03FF000 as "present, writable".
-	movl $(0x000B8000 | 0x003), boot_page_table1 - 0xC0000000 + 1023 * 4
+_setup_paging:
+	.extern init_page_region
+	/* Set up initial page region, which was zero'd for us by the loader */
+	mov $(init_page_region - KERNEL_HIGHER_HAFL), %edi
 
-	# The page table is used at both page directory entry 0 (virtually from 0x0
-	# to 0x3FFFFF) (thus identity mapping the kernel) and page directory entry
-	# 768 (virtually from 0xC0000000 to 0xC03FFFFF) (thus mapping it in the
-	# higher half). The kernel is identity mapped because enabling paging does
-	# not change the next instruction, which continues to be physical. The CPU
-	# would instead page fault if there was no identity mapping.
+	/* PDT[0] = &PT[0] | (PRESENT, WRITABLE, KERNEL) */
+	// notice flag is 0x3 and remain 0x1000 is offset to the PT[0] pointer
+	// which can be break as: mov 0x03, eax; add 0x1000, eax
+	mov $0x1003, %eax  
+	add %edi, %eax
+	mov %eax, (%edi)
 
-	# Map the page table to both virtual addresses 0x00000000 and 0xC0000000.
-	movl $(boot_page_table1 - 0xC0000000 + 0x003), boot_page_directory - 0xC0000000 + 0
-	movl $(boot_page_table1 - 0xC0000000 + 0x003), boot_page_directory - 0xC0000000 + 768 * 4
+	/* PDT[768] = &PT[0] | (PRESENT, WRITABLE, KERNEL) */
+	// kernel higher half mapping (remember size of entry = 4B)
+	add $768 * 4, %edi
+	mov %eax, (%edi)
 
-	# Set cr3 to the address of the boot_page_directory.
-	movl $(boot_page_directory - 0xC0000000), %ecx
-	movl %ecx, %cr3
+	/* Setup 4MB indentity mapping(1MB) + multiboot + kernel to PDT[0] */
+	// FIXME: if the kernel size is largen than 3MB, need more PT
+	// FIXME!: Remeber the size of frams_bitmap for 4GB mem is 
+	add $0x1000 - 768 * 4, %edi
+	mov $0x0003, %ebx
+	mov $1024, %ecx
+
+_set_entry:
+	mov %ebx, (%edi)
+	add $0x1000, %ebx
+	add $4, %edi
+	loop _set_entry
+
+_en_paging:
+	# Set cr3 to the address of the page_directory.
+	mov $(init_page_region - KERNEL_HIGHER_HAFL), %edi
+	mov %edi, %cr3
+
+	# Set PSE bit in CR4 to enable 4MB pages
+	mov %cr4, %ecx
+	or $0x00000010, %ecx
+	mov %ecx, %cr4
 
 	# Enable paging and the write-protect bit.
-	movl %cr0, %ecx
-	orl $0x80010000, %ecx
-	movl %ecx, %cr0
+	mov %cr0, %ecx
+	or $0x80010000, %ecx
+	mov %ecx, %cr0
 
+_higher_half_enter:
 	# Jump to higher half with an absolute jump. 
-	lea 4f, %ecx
+	lea start_hihger_half, %ecx
 	jmp *%ecx
 
 .section .text
-
-4:
+start_hihger_half:
+	.extern kenter
+	.type kenter, @function
 	# At this point, paging is fully set up and enabled.
 
 	# Unmap the identity mapping as it is now unnecessary. 
@@ -205,18 +171,9 @@ _start:
 	movl %cr3, %ecx
 	movl %ecx, %cr3
 
-	# Set up the stack.
-	mov $stack_top, %esp
-
 	# Enter the high-level kernel.
-	# push multiboot info
-#	pushl $0
-#	pushl %esp
-#	pushl $0
-#	pushl $0
-	pushl %ebx /* Multiboot header pointer */
-	pushl %eax /* Multiboot header magic */
-
+  # at this point, multiboot magic and pointer has already pushed
+	# when first jump to _start, so free to enter the kernel entry
 	# call kenerl entry point
 	call kenter
 

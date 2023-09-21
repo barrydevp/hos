@@ -7,17 +7,22 @@ SECTIONS
 	/* which will be mapped to 1MB in the physical address space. */
 	/* Note that we page-align the sections. */
 
-	_kernel_boot = .;
+	_bootloader_start = .;
 
 	.multiboot.data : {
 		*(.multiboot.data)
+		*(.bootstrap_stack)
 	}
 
 	.multiboot.text : {
 		*(.multiboot.text)
 	}
 
-	_kernel_higher_half = 0xc0000000;
+
+	/* Add a symbol that indicates the end address of the bootloader. */
+	_bootloader_end = .;
+
+	_kernel_higher_half = 0xC0000000;
 
 	. += _kernel_higher_half;
 	_kernel_start = .;
@@ -47,7 +52,6 @@ SECTIONS
 	{
 		*(COMMON)
 		*(.bss .bss.*)
-		*(.bootstrap_stack)
 	}
 	/* Add a symbol that indicates the end address of the kernel. */
 	_kernel_end = .;

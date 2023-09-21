@@ -31,15 +31,15 @@ void vga_scroll() {
   uint8_t *video = (unsigned char *)VGA_MEMORY;
 
   // move VGA_COLS up
-  for (uint32_t i = 1; i < VGA_ROWS; i++) {
-    for (uint32_t j = 0; j < VGA_COLS; j++) {
+  for (int i = 1; i < VGA_ROWS; i++) {
+    for (int j = 0; j < VGA_COLS; j++) {
       video[VIDEO_INDEX(j, i - 1)] = video[VIDEO_INDEX(j, i)];
       video[VIDEO_INDEX(j, i - 1) + 1] = video[VIDEO_INDEX(j, i) + 1];
     }
   }
 
   // now clear the last line
-  for (uint32_t i = 0; i < VGA_COLS; i++) {
+  for (int i = 0; i < VGA_COLS; i++) {
     video[VIDEO_INDEX(i, VGA_ROWS - 1)] = VGA_BLANK_CHAR;
     video[VIDEO_INDEX(i, VGA_ROWS - 1) + 1] = screen_color;
   }
@@ -236,6 +236,10 @@ void vga_set_cursor(const uint8_t x, const uint8_t y) {
   // enable_interrupts();
 }
 
-void vga_init(void) {
+void vga_init(boot_info_t *boot_info) {
+  // struct multiboot_tag_framebuffer *fb =
+  //   boot_info->multiboot_header->multiboot_framebuffer;
+  // uint32_t addr = fb->common.framebuffer_addr;
+
   vga_clr(0);
 }

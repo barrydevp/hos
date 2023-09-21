@@ -7,3 +7,4 @@
 -Wno-unused-function
 -Wno-unused-parameter
 -Wwrite-strings
+-Wno-int-to-pointer-cast

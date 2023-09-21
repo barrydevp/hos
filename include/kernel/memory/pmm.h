@@ -2,7 +2,7 @@
 
 #include <kernel/types.h>
 #include <kernel/kernel.h>
-#include <kernel/multiboot.h>
+#include <kernel/boot.h>
 
 #define PMM_FRAMES_PER_BYTE 8
 #define PMM_FRAME_SIZE 4096
@@ -32,7 +32,6 @@ uintptr_t pmm_allocate_frames(size_t n);
 void pmm_free_frame(uintptr_t frame_addr);
 uint32_t get_total_frames();
 
-void pmm_init(struct multiboot_tag_basic_meminfo *,
-              struct multiboot_tag_mmap *);
+void pmm_init(struct boot_info_t *boot_info);
 
 void pmm_init_test(uint32_t *frames_list, uint32_t size);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <kernel/types.h>
+#include <kernel/boot.h>
 
 // start of video memory
 #define VGA_MEMORY 0xB8000
@@ -31,7 +32,7 @@
 #define VGA_YELLOW 14
 #define VGA_WHITE 15
 
-void vga_init(void);
+void vga_init(boot_info_t *boot_info);
 
 void vga_clr(const uint8_t character);
 void vga_putc(const char character);

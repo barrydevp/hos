@@ -25,7 +25,8 @@ extern void *memmove(void *dest, const void *src, size_t n);
 // extern size_t strcspn(const char *s, const char *c);
 // extern size_t strspn(const char *s, const char *c);
 extern size_t strlen(const char *s);
-//
+extern size_t strnlen(const char *s, size_t count);
+
 // extern int atoi(const char *s);
 //
 // extern char *strtok_r(char *str, const char *delim, char **saveptr);

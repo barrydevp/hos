@@ -1,4 +1,5 @@
 #include <kernel/memory/pmm.h>
+#include <kernel/memory/vmm.h>
 #include <kernel/multiboot.h>
 #include <kernel/string.h>
 
@@ -8,7 +9,6 @@ static uint32_t max_frames = 0;
 static uint32_t used_frames = 0;
 static uint32_t frames_bitmap_size = 0;
 static uint32_t lowest_available = 0;
-static char *heapStart = NULL;
 
 /**
  * @brief Mark a physical page frame as in use.
@@ -192,7 +192,7 @@ int32_t pmm_first_nfree_frames(size_t n) {
   return -1;
 }
 
-inline void pmm_mark_frame_used(uint32_t frame) {
+static inline void pmm_mark_frame_used(uint32_t frame) {
   pmm_frame_set(frame);
   used_frames++;
 }
@@ -242,22 +242,81 @@ void pmm_init_test(uint32_t *frames_list, uint32_t size) {
   max_frames = size * 32;
 }
 
-void pmm_init(struct multiboot_tag_basic_meminfo *meminfo,
-              struct multiboot_tag_mmap *tag_mmap) {
-  // memsize = (meminfo->mem_lower + meminfo->mem_upper) * 1024;
+void pmm_regions(struct multiboot_tag_mmap *multiboot_mmap) {
+  for (struct multiboot_mmap_entry *mmap = multiboot_mmap->entries;
+       (multiboot_uint8_t *)mmap <
+       (multiboot_uint8_t *)multiboot_mmap + multiboot_mmap->size;
+       mmap = (struct multiboot_mmap_entry *)((uint32_t)mmap +
+                                              multiboot_mmap->entry_size)) {
+    if (mmap->type > 4 && mmap->addr == 0)
+      break;
 
-  memsize = get_highest_valid_address(meminfo, tag_mmap);
+    if (mmap->type == 1)
+      pmm_init_region(mmap->addr, mmap->len);
+  }
+}
+
+void pmm_init_region(uintptr_t addr, uint32_t length) {
+  uint32_t frame_start = addr / FRAME_SIZE;
+  uint32_t frames = (length & FRAME_MASK) >> FRAME_SHIFT;
+
+  for (uint32_t i = 0; i < frames; ++i) {
+    pmm_frame_unset(i + frame_start);
+  }
+}
+
+void pmm_deinit_region(uintptr_t addr, uint32_t length) {
+  uint32_t frame_start = addr / FRAME_SIZE;
+  uint32_t frames = (length & FRAME_MASK) >> FRAME_SHIFT;
+
+  for (uint32_t i = 0; i < frames; ++i) {
+    pmm_frame_set(i + frame_start);
+  }
+}
+
+// void pmm_frame_seta(uint32_t paddr) {
+//   uint32_t frame = paddr / PMM_FRAME_SIZE;
+//   if (!pmm_frame_test(frame)) {
+//     pmm_frame_set(frame);
+//     used_frames++;
+//   }
+// }
+
+uint32_t get_total_frames() {
+  return max_frames;
+}
+
+void pmm_init(struct boot_info_t *boot_info) {
+  struct multiboot_info *mboot = boot_info->multiboot_header;
+  // memsize = (meminfo->mem_lower + meminfo->mem_upper) * 1024;
+  struct multiboot_tag_mmap *tag_mmap = mboot->multiboot_mmap;
+
+  memsize =
+    get_highest_valid_address(mboot->multiboot_meminfo, mboot->multiboot_mmap);
+
+  uint32_t lowmem_phy_start = boot_info->lowmem_phy_start;
+  uint32_t lowmem_start = boot_info->lowmem_start;
 
   /* Setup page allocator frames bitmap */
-  used_frames = max_frames = memsize >> FRAME_SHIFT;
-  frames_bitmap_size = FRAME_INDEX(max_frames) * sizeof(*frames_bitmap);
+  used_frames = max_frames = (memsize >> FRAME_SHIFT) + 1;
+  frames_bitmap_size =
+    (FRAME_INDEX(max_frames - 1) + 1) * sizeof(*frames_bitmap);
   // we want frames_bitmap frame(page) aligned, bitmap fully fit into n frames(pages),
   // in another words, n frames(pages) contain only bitmap data
   frames_bitmap_size = FRAME_ALIGN(frames_bitmap_size);
   /* Allocate bitmap from KERNEL_END (KERNEL_HEAP_STRART?) */
-  frames_bitmap = (uint32_t *)FRAME_ALIGN(KERNEL_END);
+  // ALERT!: As we are already in paging mode and pmm_init run before vmm_init
+  // so in order to run next following line, frame bitmap setup,
+  // the physical memory of bitmap must be mapped in PDT.
+  // Remember we first map 4MB of kernel (1MB identity + 3MB kernel) in bootstrap.S
+  // and the size of bitmap for 4GB memory is 128KB so if 3MB is not enough
+  // for those we must increase them in bootstrap.S or (maybe use another approach?
+  // that setup an temporary paging after boot)
+  frames_bitmap = (uint32_t *)FRAME_ALIGN(lowmem_start);
   /* Mark all frames as used */
   memset((void *)frames_bitmap, 0xFF, frames_bitmap_size);
+  lowmem_phy_start += frames_bitmap_size;
+  lowmem_start += frames_bitmap_size;
 
   /* Map valid memory into bitmap - memory region initialization */
   multiboot_memory_map_t *mmap = tag_mmap->entries;
@@ -276,18 +335,14 @@ void pmm_init(struct multiboot_tag_basic_meminfo *meminfo,
   // we use NULL = 0x0 as a null_pointer
   pmm_frame_set(0);
 
-  /* Mark some kernel region as used */
-  // // boot region
-  // pmm_deinit_region(0x0, KERNEL_BOOT);
-  // // running-kernel region
-  // pmm_deinit_region((uintptr_t)(KERNEL_START - KERNEL_HIGHER_HALF),
-  //                   KERNEL_END - KERNEL_START);
-  // // frames_bitmap region
-  // pmm_deinit_region((uintptr_t)(KERNEL_END - KERNEL_HIGHER_HALF),
-  //                   (uint32_t)frames_bitmap - KERNEL_END + frames_bitmap_size);
+  /* Mark some initial region as used */
+  // boot region
+  pmm_deinit_region(0x0, boot_info->bootloader_phy_end);
+  // running-kernel region
+  pmm_deinit_region(boot_info->kernel_phy_start, boot_info->kernel_phy_end);
 
-  /* Now mark everything up to end of bitmap as in use */
-  pmm_deinit_region(0x0, (uint32_t)frames_bitmap + frames_bitmap_size);
+  /* Now mark everything up to current start of lowmem as in use */
+  pmm_deinit_region(boot_info->lowmem_phy_start, lowmem_phy_start);
 
   /* Count available and used frames */
   for (uint32_t i = 0; i < FRAME_INDEX(max_frames); ++i) {
@@ -299,50 +354,13 @@ void pmm_init(struct multiboot_tag_basic_meminfo *meminfo,
     }
   }
 
-  /* Set the start address of HEAP region */
-  heapStart = (char *)frames_bitmap + frames_bitmap_size;
+  /* Modify the start address of HEAP region if dedicated heap_start 
+   * is overlapped with the lowmem_current
+   */
+  if (boot_info->heap_start < lowmem_start) {
+    boot_info->heap_start = lowmem_start;
+  }
+  boot_info->lowmem_current = lowmem_start;
 
   // log("PMM: Done");
-}
-
-void pmm_regions(struct multiboot_tag_mmap *multiboot_mmap) {
-  for (struct multiboot_mmap_entry *mmap = multiboot_mmap->entries;
-       (multiboot_uint8_t *)mmap <
-       (multiboot_uint8_t *)multiboot_mmap + multiboot_mmap->size;
-       mmap = (struct multiboot_mmap_entry *)((uint32_t)mmap +
-                                              multiboot_mmap->entry_size)) {
-    if (mmap->type > 4 && mmap->addr == 0)
-      break;
-
-    if (mmap->type == 1)
-      pmm_init_region(mmap->addr, mmap->len);
-  }
-}
-
-void pmm_init_region(uintptr_t addr, uint32_t length) {
-  uint32_t frames = (addr + (length & FRAME_MASK)) >> FRAME_SHIFT;
-
-  for (uint32_t i = 0; i < frames; ++i) {
-    pmm_frame_unset(i);
-  }
-}
-
-void pmm_deinit_region(uintptr_t addr, uint32_t length) {
-  uint32_t frames = (addr + (length & FRAME_MASK)) >> FRAME_SHIFT;
-
-  for (uint32_t i = 0; i < frames; ++i) {
-    pmm_frame_set(i);
-  }
-}
-
-// void pmm_frame_seta(uint32_t paddr) {
-//   uint32_t frame = paddr / PMM_FRAME_SIZE;
-//   if (!pmm_frame_test(frame)) {
-//     pmm_frame_set(frame);
-//     used_frames++;
-//   }
-// }
-
-uint32_t get_total_frames() {
-  return max_frames;
 }

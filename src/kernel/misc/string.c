@@ -149,6 +149,17 @@ size_t strlen(const char *s) {
   return s - a;
 }
 
+size_t strnlen(const char *s, size_t count)
+{
+    const char *sc;
+
+    for (sc = s; *sc != '\0' && count--; ++sc) {}
+
+    long len = sc - s;
+
+    return (len < 0) ? 0 : (size_t)len;
+}
+
 // int strcmp(const char *a, const char *b)
 // {
 // 	uint32_t i = 0;

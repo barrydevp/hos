@@ -98,9 +98,13 @@ int main() {
   // printf("0x%08x\n", frames[1]);
 
   uint32_t memsize = 0xFFFFFFFF;
-  uint32_t max_frames = memsize >> FRAME_SHIFT;
-  uint32_t frames_bitmap_size = FRAME_INDEX(max_frames) * 4;
-  PRINTN(frames_bitmap_size);
+  uint32_t max_frames = (memsize >> FRAME_SHIFT)+1;
+  printf("%d\n", max_frames);
+  uint32_t frames_bitmap_size = (FRAME_INDEX(max_frames)) * 4;
+  printf("%d\n", frames_bitmap_size / 1024);
+  printf("%d\n", (memsize / 4096)+1);
+  printf("%d\n", ((memsize / 4096) + 1)/8);
+  // PRINTN(frames_bitmap_size);
   // we want frames_bitmap frame(page) aligned, bitmap fully fit into n frames(pages),
   // in another words, n frames(pages) contain only bitmap data
   frames_bitmap_size = FRAME_ALIGN(frames_bitmap_size);

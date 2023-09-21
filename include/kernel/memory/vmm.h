@@ -6,8 +6,9 @@
 #pragma once
 
 #include <kernel/types.h>
-
-#include "pmm.h"
+#include <kernel/kernel.h>
+#include <kernel/boot.h>
+#include <kernel/memory/pmm.h>
 
 #define PAGE_SIZE 4096
 #define PAGE_SHIFT 12
@@ -15,18 +16,63 @@
 #define PAGE_LOW_MASK (PAGE_SIZE - 1)
 #define PAGE_ALIGN(addr) (((addr) + PAGE_LOW_MASK) & PAGE_MASK)
 #define PAGE_TABLE_SIZE 1024
-#define KERNEL_HEAP_TOP 0xF0000000
-#define KERNEL_HEAP_BOTTOM 0xD0000000
-#define USER_HEAP_TOP 0x40000000
+#define ENTRY_MASK 0x3FF // 10 bits
+//! i86 architecture defines 1024 entries per table--do not change
+#define PAGES_PER_TABLE 1024
+#define PAGES_PER_DIR 1024
+// Base address of last entry (1024) recursive mapping
+#define PAGE_DIRECTORY_BASE 0xFFFF0000
+#define PAGE_TABLE_BASE 0xFFC00000
 
-// struct vm_area_struct;
-// struct mm_struct;
-
+#define PDE_INDEX(x) (((x) >> 22) & ENTRY_MASK)
+#define PTE_INDEX(x) (((x) >> 12) & ENTRY_MASK)
 // PML = Page Multiple Level , we use this name alias for both PDE and PTE
 // since some first bits of them have the same meaning
-#define PML_KERNEL_ACCESS = 0x03
-#define PML_USER_ACCESS = 0x07
-#define LARGE_PAGE_BIT = 0x08
+#define PML_KERNEL_ACCESS 0x03
+#define PML_USER_ACCESS 0x07
+#define LARGE_PAGE_BIT 0x08
+#define PML_DIR_VADDR 0xFFFF0000
+
+#define VMM_FLAG_KERNEL 0x01
+#define VMM_FLAG_WRITABLE 0x02
+#define VMM_FLAG_NOCACHE 0x04
+#define VMM_FLAG_WRITETHROUGH 0x08
+// #define VMM_FLAG_SPEC         0x10
+// #define VMM_FLAG_WC           (MMU_FLAG_NOCACHE | MMU_FLAG_WRITETHROUGH | MMU_FLAG_SPEC)
+// #define VMM_FLAG_NOEXECUTE    0x20
+
+#define VMM_GET_MAKE 0x01
+
+#define VMM_PTR_NULL 1
+#define VMM_PTR_WRITE 2
+
+union PML {
+  struct {
+    uint32_t present : 1;
+    uint32_t writable : 1;
+    uint32_t user : 1;
+    uint32_t writethrough : 1;
+    uint32_t nocache : 1;
+    uint32_t accessed : 1;
+    uint32_t reserved : 1;
+    uint32_t size : 1;
+    uint32_t global : 1;
+    uint32_t _available : 3;
+    uint32_t frame : 20;
+  } pdbits;
+  struct {
+    uint32_t present : 1;
+    uint32_t writable : 1;
+    uint32_t user : 1;
+    uint32_t reserved1 : 2;
+    uint32_t accessed : 1;
+    uint32_t dirty : 1;
+    uint32_t reserved2 : 2;
+    uint32_t _available : 3;
+    uint32_t frame : 20;
+  } ptbits;
+  uint32_t raw;
+};
 
 //! this format is defined by the i86 architecture--be careful if you modify it
 enum PAGE_PDE_FLAGS {
@@ -60,8 +106,6 @@ union PDE {
   uint32_t raw;
 };
 
-// typedef uint32_t pt_entry;
-
 //! i86 architecture defines this format so be careful if you modify it
 enum PAGE_PTE_FLAGS {
   I86_PTE_PRESENT = 0x1, //0000000000000000000000000000001
@@ -92,43 +136,74 @@ union PTE {
   uint32_t raw;
 };
 
-// typedef uint32_t pd_entry;
+// struct page {
+//   uint32_t frame;
+//   struct list_head sibling;
+//   uint32_t virtual;
+// };
+//
+// struct pages {
+//   uint32_t paddr;
+//   uint32_t number_of_frames;
+//   uint32_t vaddr;
+// };
 
-//! i86 architecture defines 1024 entries per table--do not change
-#define PAGES_PER_TABLE 1024
-#define PAGES_PER_DIR 1024
+/// @brief A page table.
+/// @details
+/// It contains 1024 entries which can be addressed by 10 bits (log_2(1024)).
+typedef struct page_table_t {
+  union PML pages[1024]; ///< Array of pages.
+} __attribute__((aligned(PAGE_SIZE))) page_table_t;
 
-struct page {
-  uint32_t frame;
-  struct list_head sibling;
-  uint32_t virtual;
-};
+/// @brief A page directory.
+/// @details In the two-level paging, this is the first level.
+typedef struct page_directory_t {
+  /// We need a table that contains virtual address, so that we can
+  /// actually get to the tables (size: 1024 * 4 = 4096 byte).
+  union PML entries[1024];
+} __attribute__((aligned(PAGE_SIZE))) page_directory_t;
 
-struct pages {
-  uint32_t paddr;
-  uint32_t number_of_frames;
-  uint32_t vaddr;
-};
+/// @brief Virtual Memory Area, used to store details of a process segment.
+typedef struct vm_area_struct_t {
+  /// Memory descriptor associated.
+  // struct mm_struct_t *vm_mm;
+  /// Start address of the segment, inclusive.
+  uint32_t vm_start;
+  /// End address of the segment, exclusive.
+  uint32_t vm_end;
+  /// Flags.
+  unsigned short vm_flags;
+  /// rbtree node.
+  // struct rb_node vm_rb;
+} vm_area_struct_t;
 
-struct ptable {
-  pt_entry m_entries[PAGES_PER_TABLE];
-};
+void vmm_page_allocate(union PML *page, uint32_t flags);
+void vmm_page_map_addr(union PML *page, uint32_t flags, uintptr_t physAddr);
+void vmm_page_free(union PML *page);
 
-struct pdirectory {
-  pd_entry m_entries[PAGES_PER_DIR];
-};
+void vmm_ptable_allocate(union PML *pde, uint32_t flags);
 
-void vmm_init();
-struct pdirectory *vmm_get_directory();
-void vmm_map_address(struct pdirectory *dir, uint32_t virt, uint32_t phys,
-                     uint32_t flags);
-void vmm_unmap_address(struct pdirectory *va_dir, uint32_t virt);
-void vmm_unmap_range(struct pdirectory *va_dir, uint32_t vm_start,
-                     uint32_t vm_end);
-void *create_kernel_stack(int32_t blocks);
-struct pdirectory *vmm_create_address_space(struct pdirectory *dir);
-uint32_t vmm_get_physical_address(uint32_t vaddr, bool is_page);
-struct pdirectory *vmm_fork(struct pdirectory *va_dir);
+union PML *vmm_create_page(uintptr_t virtAddr, int flags);
+
+page_directory_t *vmm_get_kernel_directory(void);
+page_directory_t *vmm_get_directory(void);
+void vmm_set_directory(page_directory_t *new_pdir);
+page_directory_t *vmm_clone_pdir(page_directory_t *from);
+
+void vmm_invalidate(uintptr_t addr);
+
+void vmm_init(struct boot_info_t *boot_info);
+
+// struct pdirectory *vmm_get_directory();
+// void vmm_map_address(struct pdirectory *dir, uint32_t virt, uint32_t phys,
+//                      uint32_t flags);
+// void vmm_unmap_address(struct pdirectory *va_dir, uint32_t virt);
+// void vmm_unmap_range(struct pdirectory *va_dir, uint32_t vm_start,
+//                      uint32_t vm_end);
+// void *create_kernel_stack(int32_t blocks);
+// struct pdirectory *vmm_create_address_space(struct pdirectory *dir);
+// uint32_t vmm_get_physical_address(uint32_t vaddr, bool is_page);
+// struct pdirectory *vmm_fork(struct pdirectory *va_dir);
 
 // // malloc.c
 // void *sbrk(size_t n);
