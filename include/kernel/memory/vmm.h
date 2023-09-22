@@ -187,7 +187,7 @@ union PML *vmm_create_page(uintptr_t virtAddr, int flags);
 
 page_directory_t *vmm_get_kernel_directory(void);
 page_directory_t *vmm_get_directory(void);
-void vmm_set_directory(page_directory_t *new_pdir);
+void vmm_set_directory(page_directory_t *new_pdir, uint32_t phy_addr);
 page_directory_t *vmm_clone_pdir(page_directory_t *from);
 
 void vmm_invalidate(uintptr_t addr);

@@ -39,38 +39,6 @@ void vmm_invalidate(uintptr_t addr) {
   // arch_tlb_shootdown(addr);
 }
 
-void vmm_init(struct boot_info_t *boot_info) {
-  // initialize page table directory
-  // log("VMM: Initializing");
-
-  // heap_start = (char *)boot_info->heap_start;
-  // uint32_t lowmem_current = boot_info->lowmem_current;
-
-  // allocate page directory
-  k_pdir = (page_directory_t *)init_page_region[0];
-  // lowmem_current += sizeof(page_directory_t);
-
-  /* Preallocate ptable for higher half kernel and set KERNEL ACCESS protected */
-  for (int i = KERNEL_PDE_START + KERNEL_INIT_NPDE; i < 1023; ++i) {
-    vmm_ptable_allocate(&k_pdir->entries[i], PML_KERNEL_ACCESS);
-  }
-
-  // log("VMM: Setup recursive page directory");
-  /* Recursive mapping */
-  k_pdir->entries[1023].raw = ((uintptr_t)&k_pdir & PAGE_MASK) |
-                              PML_KERNEL_ACCESS;
-
-  /* Allocate page for lowmem + kernel stack region */
-  uint32_t lowmem_size = (boot_info->stack_base - boot_info->lowmem_start);
-  for (uint32_t i_virt = 0; i_virt < lowmem_size; i_virt += PAGE_SIZE) {
-    vmm_create_page(boot_info->lowmem_start + i_virt, PML_KERNEL_ACCESS);
-  }
-
-  vmm_set_directory(k_pdir);
-  // vmm_paging(va_dir, pa_dir);
-  // log("VMM: Done");
-}
-
 static inline void vmm_page_set_flags(union PML *page, uint32_t flags) {
   page->raw |= PAGE_LOW_MASK | flags;
 }
@@ -85,7 +53,7 @@ static inline void vmm_page_set_flags(union PML *page, uint32_t flags) {
  */
 void vmm_page_allocate(union PML *page, uint32_t flags) {
   if (page->ptbits.frame == 0) {
-    uintptr_t index = pmm_allocate_frame();
+    uint32_t index = pmm_allocate_frame();
     page->ptbits.frame = index;
   }
   vmm_page_set_flags(page, flags);
@@ -109,7 +77,7 @@ void vmm_page_map_address(union PML *page, uint32_t flags, uintptr_t physAddr) {
  */
 void vmm_ptable_allocate(union PML *pde, uint32_t flags) {
   if (pde->pdbits.frame == 0) {
-    uintptr_t index = pmm_allocate_frame();
+    uint32_t index = pmm_allocate_frame();
     pde->pdbits.frame = index;
   }
   vmm_page_set_flags(pde, flags);
@@ -132,8 +100,8 @@ page_directory_t *vmm_get_kernel_directory(void) {
  */
 page_directory_t *vmm_get_directory(void) {
   // It's easy because we use recursive mapping
-  // return (union PML *)0xFFFFF000;
-  return cur_pdir;
+  return (page_directory_t *)0xFFFFF000;
+  // return cur_pdir;
 }
 
 /**
@@ -142,6 +110,16 @@ page_directory_t *vmm_get_directory(void) {
 page_table_t *vmm_r_get_ptable(uintptr_t virtAddr) {
   // It's easy because we use recursive mapping
   return (page_table_t *)PAGE_TABLE_BASE + PDE_INDEX(virtAddr);
+}
+
+static inline uintptr_t __get_cr3(void) {
+  uintptr_t cr3;
+  asm volatile("mov %%cr3, %0" : "=r"(cr3));
+  return (cr3);
+}
+
+static inline void __set_cr3(uintptr_t cr3) {
+  asm volatile("movl %0, %%cr3" : : "r"(cr3));
 }
 
 /**
@@ -157,15 +135,16 @@ page_table_t *vmm_r_get_ptable(uintptr_t virtAddr) {
  *                 a process struct; if NULL is passed, the initial kernel directory
  *                 will be used and no userspace mappings will be present.
  */
-void vmm_set_directory(page_directory_t *new_pdir) {
+void vmm_set_directory(page_directory_t *new_pdir, uint32_t phy_addr) {
   if (!new_pdir)
     new_pdir = k_pdir;
 
   cur_pdir = new_pdir;
   // k_core->current_pml = new_pdir;
-  uintptr_t pdir_frame = (uintptr_t)&new_pdir->entries[1023];
+  // uintptr_t pdir_frame = (uintptr_t)&new_pdir->entries[1023];
 
-  asm volatile("movl %0, %%cr3" : : "r"(pdir_frame & PAGE_MASK));
+  // asm volatile("movl %0, %%cr3" : : "r"(pdir_frame & PAGE_MASK));
+  __set_cr3(phy_addr & PAGE_MASK);
 }
 
 page_directory_t *vmm_clone_pdir(page_directory_t *from) {
@@ -450,3 +429,35 @@ union PML *vmm_create_page(uintptr_t virtAddr, int flags) {
 //     kfree(aligned_object);
 //   return forked_dir;
 // }
+
+void vmm_init(struct boot_info_t *boot_info) {
+  // initialize page table directory
+  // log("VMM: Initializing");
+
+  // heap_start = (char *)boot_info->heap_start;
+  // uint32_t lowmem_current = boot_info->lowmem_current;
+
+  // allocate page directory
+  k_pdir = (page_directory_t *)init_page_region[0];
+  uintptr_t k_phy_pdir = __get_cr3();
+  // lowmem_current += sizeof(page_directory_t);
+
+  /* Preallocate ptable for higher half kernel and set KERNEL ACCESS protected */
+  for (int i = KERNEL_PDE_START + KERNEL_INIT_NPDE; i < 1023; ++i) {
+    vmm_ptable_allocate(&k_pdir->entries[i], PML_KERNEL_ACCESS);
+  }
+
+  // log("VMM: Setup recursive page directory");
+  /* Recursive mapping */
+  k_pdir->entries[1023].raw = (k_phy_pdir & PAGE_MASK) | PML_KERNEL_ACCESS;
+
+  /* Allocate page for lowmem + kernel stack region */
+  uint32_t lowmem_size = (boot_info->stack_base - boot_info->lowmem_start);
+  for (uint32_t i_virt = 0; i_virt < lowmem_size; i_virt += PAGE_SIZE) {
+    vmm_create_page(boot_info->lowmem_start + i_virt, PML_KERNEL_ACCESS);
+  }
+
+  vmm_set_directory(k_pdir, k_phy_pdir);
+  // vmm_paging(va_dir, pa_dir);
+  // log("VMM: Done");
+}

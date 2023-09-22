@@ -32,7 +32,7 @@ void idt_set_gate(uint32_t i, I86_IVT isr, uint16_t sel, uint8_t flags) {
   idt[i].reserved = 0;
 }
 
-static void idt_default_handler(struct interrupt_regs *regs) {
+static void idt_default_handler(pt_regs *regs) {
   // disable_interrupts();
   //
   // uint8_t int_no = regs->int_no & 0xff;
@@ -113,8 +113,7 @@ void idt_init() {
   idt_load((uint32_t)&idtr);
 }
 
-static void panic(const char *desc, struct interrupt_regs *r,
-                  uint32_t faulting_address) {
+static void panic(const char *desc, pt_regs *r, uint32_t faulting_address) {
   /* Stop all other cores */
   // arch_fatal_prepare();
   //
@@ -125,17 +124,21 @@ static void panic(const char *desc, struct interrupt_regs *r,
   //                                      "kernel",
   //         faulting_address);
 
+  dprintf("\033[31mPanic!\033[0m %s (%s) at 0x%p\n", desc, "kernel", faulting_address);
+  dprintf("Page fault: 0x%x\n", faulting_address);
+
+
   /* Dump register state */
-  // dprintf(
-  //   "Registers at interrupt:\n"
-  //   "  $eip=0x%016lx\n"
-  //   "  $esi=0x%016lx,$edi=0x%016lx,$ebp=0x%016lx,$esp=0x%016lx\n"
-  //   "  $eax=0x%016lx,$ebx=0x%016lx,$ecx=0x%016lx,$edx=0x%016lx\n"
-  //   "  $gs= 0x%016lx,$fs= 0x%016lx,$es=0x%016lx,$ds=0x%016lx\n"
-  //   "  cs=0x%016lx  ss=0x%016lx eflags=0x%016lx int=0x%02lx err=0x%02lx\n",
-  //   r->eip, r->esi, r->edi, r->ebp, r->esp, r->eax, r->ebx, r->ecx, r->edx,
-  //   r->gs, r->fs, r->es, r->ds, r->cs, r->ss, r->eflags, r->int_no,
-  //   r->err_code);
+  dprintf(
+    "Registers at interrupt:\n"
+    "  $eip=0x%p\n"
+    "  $esi=0x%p,$edi=0x%p,$ebp=0x%p,$esp=0x%p\n"
+    "  $eax=0x%p,$ebx=0x%p,$ecx=0x%p,$edx=0x%p\n"
+    "  $gs=0x%p,$fs=0x%p,$es=0x%p,$ds=0x%p\n"
+    "  cs=0x%p ss=0x%p eflags=0x%p int=0x%x err=0x%x\n",
+    r->eip, r->esi, r->edi, r->ebp, r->esp, r->eax, r->ebx, r->ecx, r->edx,
+    r->gs, r->fs, r->es, r->ds, r->cs, r->ss, r->eflags, r->int_no,
+    r->err_code);
 
   // /* Dump GS segment register information */
   // uint32_t gs_base_low, gs_base_high;
@@ -155,15 +158,15 @@ static void panic(const char *desc, struct interrupt_regs *r,
   // /* Stop this core */
   // arch_fatal();
 
-  dprintf("Panic! (");
-  dprintf(desc);
-  dprintf(")\n");
+  // dprintf("Panic! (");
+  // dprintf(desc);
+  // dprintf(")\n");
 }
 
 /**
  * @brief Double fault should always panic.
  */
-static void _double_fault(struct interrupt_regs *r) {
+static void _double_fault(pt_regs *r) {
   panic("Double fault", r, 0);
 }
 
@@ -175,7 +178,7 @@ static void _double_fault(struct interrupt_regs *r) {
  *
  * @param r Interrupt register context
  */
-static void _general_protection_fault(struct interrupt_regs *r) {
+static void _general_protection_fault(pt_regs *r) {
   /* Were we in the kernel? */
   // if (!this_core->current_process || r->cs == 0x08) {
   /* Then that's a panic. */
@@ -195,7 +198,7 @@ static void _general_protection_fault(struct interrupt_regs *r) {
  *
  * @param r Interrupt register context
  */
-static void _page_fault(struct interrupt_regs *r) {
+static void _page_fault(pt_regs *r) {
   /* Obtain the "cause" address */
   uintptr_t faulting_address;
   asm volatile("mov %%cr2, %0" : "=r"(faulting_address));
@@ -237,7 +240,7 @@ static void _page_fault(struct interrupt_regs *r) {
  * @param r           Interrupt register context
  * @param description Textual description of the exception, for panic messages.
  */
-static void _exception(struct interrupt_regs *r, const char *description) {
+static void _exception(pt_regs *r, const char *description) {
   /* If we were in kernel space, this is a panic */
   // if (!this_core->current_process || r->cs == 0x08) {
   // 	panic(description, r, r->int_no);
@@ -256,7 +259,7 @@ static void _exception(struct interrupt_regs *r, const char *description) {
  * @param r    Interrupt register context
  * @param irq  Translated IRQ number
  */
-static void _handle_irq(struct interrupt_regs *r, uint32_t irq) {
+static void _handle_irq(pt_regs *r, uint32_t irq) {
   // for (size_t i = 0; i < IRQ_CHAIN_DEPTH; i++) {
   //   I86_IRQ_HANDLER handler = irq_routines[i * IRQ_CHAIN_SIZE + irq];
   //   if (!handler)
@@ -278,7 +281,7 @@ static void _handle_irq(struct interrupt_regs *r, uint32_t irq) {
 #define IRQ(i) case i: _handle_irq(r,i-32); break;
 // clang-format on
 
-void isr_handler_inner(struct interrupt_regs *r) {
+void isr_handler_inner(pt_regs *r) {
   // clang-format off
   switch (r->int_no) {
     EXC(0, "divide-by-zero");
@@ -364,7 +367,7 @@ void isr_handler_inner(struct interrupt_regs *r) {
   // return r;
 }
 
-void isr_handler(struct interrupt_regs *r) {
+void isr_handler(pt_regs *r) {
   isr_handler_inner(r);
 }
 

@@ -20,7 +20,7 @@ static void pit_set_timer_phase(long hz) {
 /**
  * @brief Interrupt handler for the PIT.
  */
-static int32_t pit_interrupt(struct interrupt_regs *r) {
+static int32_t pit_interrupt(pt_regs *r) {
   // extern void arch_update_clock(void);
   // arch_update_clock();
 

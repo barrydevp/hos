@@ -118,7 +118,7 @@ int32_t pmm_first_free_frame() {
       }
   }
 
-  dprintf("Out of memory.\n");
+  // dprintf("Out of memory.\n");
 
   return -1;
 }
@@ -197,7 +197,7 @@ static inline void pmm_mark_frame_used(uint32_t frame) {
   used_frames++;
 }
 
-uintptr_t pmm_allocate_frame(void) {
+static inline uint32_t __pmm_allocate_frame(void) {
   // if (max_frames <= used_frames)
   //   return 0;
 
@@ -207,23 +207,43 @@ uintptr_t pmm_allocate_frame(void) {
 
   pmm_mark_frame_used(frame);
 
+  return frame;
+}
+
+uint32_t pmm_allocate_frame(void) {
+  return __pmm_allocate_frame();
+}
+
+uintptr_t pmm_allocate_frame_addr(void) {
+  uint32_t frame = __pmm_allocate_frame();
+
   uintptr_t addr = frame << FRAME_SHIFT;
   return addr;
 }
 
-uintptr_t pmm_allocate_frames(size_t n) {
+static inline uint32_t __pmm_allocate_frames(size_t n) {
   // if (max_frames - used_frames < n)
   //   return 0;
 
-  int frame = pmm_first_nfree_frames(n);
-  if (frame == -1)
+  int start_frame = pmm_first_nfree_frames(n);
+  if (start_frame == -1)
     return 0;
 
   for (uint32_t i = 0; i < n; ++i) {
-    pmm_mark_frame_used(frame + i);
+    pmm_mark_frame_used(start_frame + i);
   }
 
-  uint32_t addr = frame << FRAME_SHIFT;
+  return start_frame;
+}
+
+uint32_t pmm_allocate_frames(size_t n) {
+  return __pmm_allocate_frames(n);
+}
+
+uintptr_t pmm_allocate_frames_addr(size_t n) {
+  uint32_t start_frame = __pmm_allocate_frames(n);
+
+  uintptr_t addr = start_frame << FRAME_SHIFT;
   return addr;
 }
 

@@ -32,8 +32,8 @@ struct __attribute__((packed)) idtr {
 #define IRQ_CONTINUE 0
 #define IRQ_STOP 1
 
-typedef void (*I86_IVT)(struct interrupt_regs *regs);
-typedef int32_t (*I86_IRQ_HANDLER)(struct interrupt_regs *registers);
+typedef void (*I86_IVT)(pt_regs *regs);
+typedef int32_t (*I86_IRQ_HANDLER)(pt_regs *registers);
 
 void idt_init();
 void isr_install_handler(uint32_t index, I86_IRQ_HANDLER handler);
@@ -109,4 +109,4 @@ extern void irq15();
 #define IRQ15 47
 
 void irq_ack(uint32_t irq_number);
-void isr_handler(struct interrupt_regs *);
+void isr_handler(pt_regs *r);

@@ -27,8 +27,10 @@ int32_t pmm_first_nfree_frames(size_t n);
 void pmm_regions(struct multiboot_tag_mmap *multiboot_mmap);
 void pmm_init_region(uintptr_t addr, uint32_t length);
 void pmm_deinit_region(uintptr_t add, uint32_t length);
-uintptr_t pmm_allocate_frame(void);
-uintptr_t pmm_allocate_frames(size_t n);
+uint32_t pmm_allocate_frame(void);
+uintptr_t pmm_allocate_frame_addr(void);
+uint32_t pmm_allocate_frames(size_t n);
+uintptr_t pmm_allocate_frames_addr(size_t n);
 void pmm_free_frame(uintptr_t frame_addr);
 uint32_t get_total_frames();
 
