@@ -149,122 +149,115 @@ size_t strlen(const char *s) {
   return s - a;
 }
 
-size_t strnlen(const char *s, size_t count)
-{
-    const char *sc;
+size_t strnlen(const char *s, size_t count) {
+  const char *sc;
 
-    for (sc = s; *sc != '\0' && count--; ++sc) {}
+  for (sc = s; *sc != '\0' && count--; ++sc) {
+  }
 
-    long len = sc - s;
+  long len = sc - s;
 
-    return (len < 0) ? 0 : (size_t)len;
+  return (len < 0) ? 0 : (size_t)len;
 }
 
-// int strcmp(const char *a, const char *b)
-// {
-// 	uint32_t i = 0;
-// 	while (1) {
-// 		if (a[i] < b[i]) {
-// 			return -1;
-// 		} else if (a[i] > b[i]) {
-// 			return 1;
-// 		} else {
-// 			if (a[i] == '\0') {
-// 				return 0;
-// 			}
-// 			++i;
-// 		}
-// 	}
-// }
-//
-// size_t strspn(const char *s, const char *c)
-// {
-// 	const char *a = s;
-// 	size_t byteset[32 / sizeof(size_t)] = { 0 };
-//
-// 	if (!c[0]) {
-// 		return 0;
-// 	}
-// 	if (!c[1]) {
-// 		for (; *s == *c; s++)
-// 			;
-// 		return s - a;
-// 	}
-//
-// 	for (; *c && BITOP(byteset, *(unsigned char *)c, |=); c++)
-// 		;
-// 	for (; *s && BITOP(byteset, *(unsigned char *)s, &); s++)
-// 		;
-//
-// 	return s - a;
-// }
-//
-// char *strchrnul(const char *s, int c)
-// {
-// 	size_t *w;
-// 	size_t k;
-//
-// 	c = (unsigned char)c;
-// 	if (!c) {
-// 		return (char *)s + strlen(s);
-// 	}
-//
-// 	for (; (uintptr_t)s % ALIGN; s++) {
-// 		if (!*s || *(unsigned char *)s == c) {
-// 			return (char *)s;
-// 		}
-// 	}
-//
-// 	k = ONES * c;
-// 	for (w = (void *)s; !HASZERO(*w) && !HASZERO(*w ^ k); w++)
-// 		;
-// 	for (s = (void *)w; *s && *(unsigned char *)s != c; s++)
-// 		;
-// 	return (char *)s;
-// }
-//
-// char *strchr(const char *s, int c)
-// {
-// 	char *r = strchrnul(s, c);
-// 	return *(unsigned char *)r == (unsigned char)c ? r : 0;
-// }
-//
-// char *strrchr(const char *s, int c)
-// {
-// 	return memrchr(s, c, strlen(s) + 1);
-// }
-//
-// char *stpcpy(char *restrict d, const char *restrict s)
-// {
-// 	size_t *wd;
-// 	const size_t *ws;
-//
-// 	if ((uintptr_t)s % ALIGN == (uintptr_t)d % ALIGN) {
-// 		for (; (uintptr_t)s % ALIGN; s++, d++) {
-// 			if (!(*d = *s)) {
-// 				return d;
-// 			}
-// 		}
-// 		wd = (void *)d;
-// 		ws = (const void *)s;
-// 		for (; !HASZERO(*ws); *wd++ = *ws++)
-// 			;
-// 		d = (void *)wd;
-// 		s = (const void *)ws;
-// 	}
-//
-// 	for (; (*d = *s); s++, d++)
-// 		;
-//
-// 	return d;
-// }
-//
-// char *strcpy(char *restrict dest, const char *restrict src)
-// {
-// 	stpcpy(dest, src);
-// 	return dest;
-// }
-//
+int strcmp(const char *a, const char *b) {
+  uint32_t i = 0;
+  while (1) {
+    if (a[i] < b[i]) {
+      return -1;
+    } else if (a[i] > b[i]) {
+      return 1;
+    } else {
+      if (a[i] == '\0') {
+        return 0;
+      }
+      ++i;
+    }
+  }
+}
+
+size_t strspn(const char *s, const char *c) {
+  const char *a = s;
+  size_t byteset[32 / sizeof(size_t)] = { 0 };
+
+  if (!c[0]) {
+    return 0;
+  }
+  if (!c[1]) {
+    for (; *s == *c; s++)
+      ;
+    return s - a;
+  }
+
+  for (; *c && BITOP(byteset, *(unsigned char *)c, |=); c++)
+    ;
+  for (; *s && BITOP(byteset, *(unsigned char *)s, &); s++)
+    ;
+
+  return s - a;
+}
+
+char *strchrnul(const char *s, int c) {
+  size_t *w;
+  size_t k;
+
+  c = (unsigned char)c;
+  if (!c) {
+    return (char *)s + strlen(s);
+  }
+
+  for (; (uintptr_t)s % ALIGN; s++) {
+    if (!*s || *(unsigned char *)s == c) {
+      return (char *)s;
+    }
+  }
+
+  k = ONES * c;
+  for (w = (void *)s; !HASZERO(*w) && !HASZERO(*w ^ k); w++)
+    ;
+  for (s = (void *)w; *s && *(unsigned char *)s != c; s++)
+    ;
+  return (char *)s;
+}
+
+char *strchr(const char *s, int c) {
+  char *r = strchrnul(s, c);
+  return *(unsigned char *)r == (unsigned char)c ? r : 0;
+}
+
+char *strrchr(const char *s, int c) {
+  return memrchr(s, c, strlen(s) + 1);
+}
+
+char *stpcpy(char *restrict d, const char *restrict s) {
+  size_t *wd;
+  const size_t *ws;
+
+  if ((uintptr_t)s % ALIGN == (uintptr_t)d % ALIGN) {
+    for (; (uintptr_t)s % ALIGN; s++, d++) {
+      if (!(*d = *s)) {
+        return d;
+      }
+    }
+    wd = (void *)d;
+    ws = (const void *)s;
+    for (; !HASZERO(*ws); *wd++ = *ws++)
+      ;
+    d = (void *)wd;
+    s = (const void *)ws;
+  }
+
+  for (; (*d = *s); s++, d++)
+    ;
+
+  return d;
+}
+
+char *strcpy(char *restrict dest, const char *restrict src) {
+  stpcpy(dest, src);
+  return dest;
+}
+
 // size_t lfind(const char *str, const char accept)
 // {
 // 	return (size_t)strchr(str, accept);
@@ -521,28 +514,27 @@ size_t strnlen(const char *s, size_t count)
 // {
 // 	return strstr(str, accept) == str;
 // }
-//
+
 // char *strdup(const char *c)
 // {
 // 	char *out = malloc(strlen(c) + 1);
 // 	memcpy(out, c, strlen(c) + 1);
 // 	return out;
 // }
-//
-// int atoi(const char *c)
-// {
-// 	int sign = 1;
-// 	long out = 0;
-// 	if (*c == '-') {
-// 		sign = '-';
-// 		c++;
-// 	}
-//
-// 	while (*c) {
-// 		out *= 10;
-// 		out += (*c - '0');
-// 		c++;
-// 	}
-//
-// 	return out * sign;
-// }
+
+int atoi(const char *c) {
+  int sign = 1;
+  long out = 0;
+  if (*c == '-') {
+    sign = '-';
+    c++;
+  }
+
+  while (*c) {
+    out *= 10;
+    out += (*c - '0');
+    c++;
+  }
+
+  return out * sign;
+}

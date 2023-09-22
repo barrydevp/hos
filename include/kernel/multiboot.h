@@ -19,3 +19,4 @@ extern struct multiboot_info mboot;
 void multiboot_init(uint32_t addr, uint32_t magic);
 uintptr_t get_highest_valid_address(struct multiboot_tag_basic_meminfo *meminfo,
                                     struct multiboot_tag_mmap *tag_mmap);
+void load_memory_info(uint32_t *highest_address, uint32_t *addressable_size);

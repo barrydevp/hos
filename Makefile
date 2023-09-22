@@ -17,10 +17,12 @@ K_LDFLAGS  = -ffreestanding -nostdlib -lgcc # debug purpose => turn off O2 optim
 # These sources are used to determine if we should update symbols.o
 KERNEL_SRCS  = $(wildcard $(SRC)/kernel/*.c)
 KERNEL_SRCS += $(wildcard $(SRC)/kernel/*/*.c)
+KERNEL_SRCS += $(wildcard $(SRC)/kernel/*/*/*.c)
 
 # Automatically find kernel sources from relevant paths
 KERNEL_OBJS  = $(patsubst %.c,%.o,$(wildcard $(SRC)/kernel/*.c))
 KERNEL_OBJS += $(patsubst %.c,%.o,$(wildcard $(SRC)/kernel/*/*.c))
+KERNEL_OBJS += $(patsubst %.c,%.o,$(wildcard $(SRC)/kernel/*/*/*.c))
 
 # Assembly sources only come from the arch-dependent directory
 KERNEL_ASMOBJS  = $(filter-out $(SRC)/kernel/symbols.o,$(patsubst %.S,%.o,$(wildcard $(SRC)/kernel/arch/${ARCH}/*.S)))
@@ -32,8 +34,7 @@ KERNEL_LINKERLD = $(SRC)/arch/$(ARCH)/linker.ld
 
 KERNEL_HDRS  = $(wildcard include/kernel/*.h)
 KERNEL_HDRS += $(wildcard include/kernel/*/*.h)
-
-HEADERS = $(wildcard include/*.h)
+KERNEL_HDRS += $(wildcard include/kernel/*/*/*.h)
 
 # target for rust build
 RUST_TARGET = ${ARCH}-unknown-hos

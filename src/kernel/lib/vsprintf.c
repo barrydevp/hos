@@ -649,7 +649,6 @@ int printf(const char *format, ...) {
   va_start(ap, format);
   len = vsprintf(buffer, format, ap);
   va_end(ap);
-  // video_puts(buffer);
   vga_puts(buffer);
   return len;
 }
@@ -662,7 +661,6 @@ int dprintf(const char *format, ...) {
   va_start(ap, format);
   len = vsprintf(buffer, format, ap);
   va_end(ap);
-  // video_puts(buffer);
   vga_puts(buffer);
   return len;
 }

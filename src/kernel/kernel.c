@@ -10,11 +10,13 @@ int kmain() {
   // char *video_memory = (char *)0xC03FF000;
   // *video_memory = 'H';
 
+  for (int i = 0; i < 80; ++i) {
+    for (int j = 0; j < 25; ++j) {
+      vga_putc(65);
+    }
+  }
   char msg[] = "Hello World!";
   vga_puts(msg);
-
-  for (;;) {
-  }
 
   return 0;
 }

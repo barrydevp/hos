@@ -38,9 +38,9 @@ void multiboot_init(uint32_t magic, uint32_t addr) {
       //          ((struct multiboot_tag_module *)tag)->cmdline);
       //   break;
       case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
-        printf("mem_lower = %uKB, mem_upper = %uKB\n",
-               ((struct multiboot_tag_basic_meminfo *)tag)->mem_lower,
-               ((struct multiboot_tag_basic_meminfo *)tag)->mem_upper);
+        dprintf("mem_lower = %uKB, mem_upper = %uKB\n",
+                ((struct multiboot_tag_basic_meminfo *)tag)->mem_lower,
+                ((struct multiboot_tag_basic_meminfo *)tag)->mem_upper);
         mboot.multiboot_meminfo = (struct multiboot_tag_basic_meminfo *)tag;
         break;
       // case MULTIBOOT_TAG_TYPE_BOOTDEV:
@@ -52,23 +52,25 @@ void multiboot_init(uint32_t magic, uint32_t addr) {
       case MULTIBOOT_TAG_TYPE_MMAP: {
         multiboot_memory_map_t *mmap;
 
-        printf("mmap\n");
+        dprintf("mmap\n");
 
         for (mmap = ((struct multiboot_tag_mmap *)tag)->entries;
              (multiboot_uint8_t *)mmap < (multiboot_uint8_t *)tag + tag->size;
              mmap = (multiboot_memory_map_t
                        *)((unsigned long)mmap +
                           ((struct multiboot_tag_mmap *)tag)->entry_size))
-          printf(" base_addr = 0x%x%x,"
-                 " length = 0x%x%x, type = 0x%x\n",
-                 (unsigned)(mmap->addr >> 32),
-                 (unsigned)(mmap->addr & 0xffffffff),
-                 (unsigned)(mmap->len >> 32),
-                 (unsigned)(mmap->len & 0xffffffff), (unsigned)mmap->type);
+          dprintf(" base_addr = 0x%x%x,"
+                  " length = 0x%x%x, type = 0x%x\n",
+                  (unsigned)(mmap->addr >> 32),
+                  (unsigned)(mmap->addr & 0xffffffff),
+                  (unsigned)(mmap->len >> 32),
+                  (unsigned)(mmap->len & 0xffffffff), (unsigned)mmap->type);
 
         mboot.multiboot_mmap = (struct multiboot_tag_mmap *)tag;
       } break;
       case MULTIBOOT_TAG_TYPE_FRAMEBUFFER: {
+        printf("framebuffer\n");
+
         mboot.multiboot_framebuffer = (struct multiboot_tag_framebuffer *)tag;
         multiboot_uint32_t color;
         unsigned i;
@@ -76,6 +78,7 @@ void multiboot_init(uint32_t magic, uint32_t addr) {
           (struct multiboot_tag_framebuffer *)tag;
         void *fb = (void *)(unsigned long)tagfb->common.framebuffer_addr;
 
+        printf(" type=%u\n", tagfb->common.framebuffer_type);
         switch (tagfb->common.framebuffer_type) {
           case MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED: {
             unsigned best_distance, distance;
@@ -158,8 +161,8 @@ uintptr_t get_highest_valid_address(struct multiboot_tag_basic_meminfo *meminfo,
   while ((multiboot_uint8_t *)mmap <
          (multiboot_uint8_t *)tag_mmap + tag_mmap->size) {
     if (mmap->type == 1 && mmap->len &&
-        mmap->addr + mmap->len - 1 > highest_address) {
-      highest_address = (uintptr_t)mmap->addr + mmap->len - 1;
+        (uintptr_t)(mmap->addr + mmap->len) - 1 > highest_address) {
+      highest_address = (uintptr_t)(mmap->addr + mmap->len) - 1;
     }
 
     mmap =
@@ -171,4 +174,35 @@ uintptr_t get_highest_valid_address(struct multiboot_tag_basic_meminfo *meminfo,
   }
 
   return highest_address;
+}
+
+void load_memory_info(uint32_t *highest_address, uint32_t *addressable_size) {
+  struct multiboot_tag_mmap *tag_mmap = mboot.multiboot_mmap;
+  struct multiboot_tag_basic_meminfo *meminfo = mboot.multiboot_meminfo;
+  multiboot_memory_map_t *mmap = tag_mmap->entries;
+
+  // init
+  multiboot_uint64_t addr = 0;
+  multiboot_uint64_t size = 0;
+
+  while ((multiboot_uint8_t *)mmap <
+         (multiboot_uint8_t *)tag_mmap + tag_mmap->size) {
+    if (mmap->type == 1 && mmap->len) {
+      size += mmap->len;
+      if ((mmap->addr + mmap->len - 1) > addr) {
+        addr = mmap->addr + mmap->len - 1;
+      }
+    }
+
+    mmap =
+      (multiboot_memory_map_t *)((unsigned long)mmap + tag_mmap->entry_size);
+  }
+
+  // if ((uint32_t)(meminfo->mem_upper * 1024) > highest_address) {
+  //   highest_address = meminfo->mem_upper * 1024;
+  // }
+
+  *highest_address = (uint32_t)(addr & 0xffffffff);
+  *addressable_size =(uint32_t)(size & 0xffffffff); 
+  dprintf("ok: %u %u\n", *addressable_size, *highest_address);
 }

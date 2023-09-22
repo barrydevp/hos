@@ -64,11 +64,12 @@ void vmm_page_allocate(union PML *page, uint32_t flags) {
 /**
  * @brief Map the given page to the requested physical address.
  */
-void vmm_page_map_address(union PML *page, uint32_t flags, uintptr_t physAddr) {
+void vmm_page_map_addr(union PML *page, uint32_t flags, uintptr_t physAddr) {
   pmm_frame_seta(physAddr);
-  page->ptbits.frame = physAddr >> PAGE_SHIFT;
+  page->ptbits.frame = physAddr >> FRAME_SHIFT;
   vmm_page_set_flags(page, flags);
 }
+
 /**
  * @brief Set the flags for a ptable in pdirectory, and allocate a new ptable if needed.
  *
@@ -83,6 +84,14 @@ void vmm_ptable_allocate(union PML *pde, uint32_t flags) {
     pde->pdbits.frame = index;
   }
   vmm_page_set_flags(pde, flags);
+}
+
+/// @brief map a region of virtual memory
+void vmm_map_region(page_directory_t *pgd, uint32_t virt_start,
+                    uint32_t phy_start, size_t size, uint32_t flags) {
+  // for (uint32_t page_n = 0; page_n < (size >> PAGE_SHIFT); page_n++) {
+  //   vmm_create_page()
+  // }
 }
 
 /// @brief create a region of virtual memory
@@ -212,6 +221,33 @@ union PML *vmm_create_page(uintptr_t virtAddr, int flags) {
     vmm_page_allocate(&pt->pages[pt_entry], flags);
     /* zero it */
     memset((void *)virtAddr, 0, PAGE_SIZE);
+  }
+
+  return (union PML *)&pt->pages[pt_entry];
+}
+
+union PML *vmm_map_page(uintptr_t virtAddr, uintptr_t physAddr, int flags) {
+  uintptr_t pageAddr = virtAddr >> PAGE_SHIFT;
+  uint32_t pd_entry = (pageAddr >> 10) & ENTRY_MASK;
+  uint32_t pt_entry = (pageAddr)&ENTRY_MASK;
+
+  page_directory_t *pd = vmm_get_directory();
+  page_table_t *pt = vmm_r_get_ptable(virtAddr);
+
+  /* Setup page table */
+  if (!pd->entries[pd_entry].pdbits.present) {
+    vmm_ptable_allocate(&pd->entries[pd_entry], flags);
+    /* zero it */
+    memset(pt, 0, PAGE_SIZE);
+  }
+
+  if (pd->entries[pd_entry].pdbits.size) {
+    // printf("Warning: Tried to get page for a 4MiB page!\n");
+    return NULL;
+  }
+
+  if (!pt->pages[pt_entry].pdbits.present) {
+    vmm_page_map_addr(&pt->pages[pt_entry], flags, physAddr);
   }
 
   return (union PML *)&pt->pages[pt_entry];
@@ -436,13 +472,12 @@ void vmm_init(struct boot_info_t *boot_info) {
   // initialize page table directory
   // log("VMM: Initializing");
 
-  // heap_start = (char *)boot_info->heap_start;
-  // uint32_t lowmem_current = boot_info->lowmem_current;
-
   // allocate page directory
   k_pdir = (page_directory_t *)init_page_region[0];
   uintptr_t k_phy_pdir = __get_cr3();
-  // lowmem_current += sizeof(page_directory_t);
+
+  /** unmap the identity mapping first 4MB */
+  // k_pdir->entries[0].raw = 0;
 
   /* Preallocate ptable for higher half kernel and set KERNEL ACCESS protected */
   for (int i = KERNEL_PDE_START + KERNEL_INIT_NPDE; i < 1023; ++i) {
@@ -453,16 +488,27 @@ void vmm_init(struct boot_info_t *boot_info) {
   /* Recursive mapping */
   k_pdir->entries[1023].raw = (k_phy_pdir & PAGE_MASK) | PML_KERNEL_ACCESS;
 
-  /* Allocate page for lowmem used region */
-  uint32_t lowmem_used = (boot_info->lowmem_current - boot_info->lowmem_start);
-  for (uint32_t i_virt = 0; i_virt < lowmem_used; i_virt += PAGE_SIZE) {
-    vmm_create_page(boot_info->lowmem_start + i_virt, PML_KERNEL_ACCESS);
+  /* Allocate page for pmm used region */
+  // FIXME: another approach in future
+  uint32_t pmm_used = 128 * KB; // for bitmap
+  uint32_t pmm_start = FRAME_ALIGN(boot_info->lowmem_phy_end);
+  for (uint32_t i_virt = 0; i_virt < pmm_used; i_virt += PAGE_SIZE) {
+    vmm_create_page(pmm_start + i_virt, PML_KERNEL_ACCESS);
+  }
+
+  /* Map page for framebuffer region */
+  uint32_t fb_size = (boot_info->fb_end - boot_info->fb_start);
+  for (uint32_t i_virt = 0; i_virt < fb_size; i_virt += PAGE_SIZE) {
+    dprintf("fb_a: 0x%p, 0x%p\n", boot_info->fb_start + i_virt,
+            boot_info->fb_phy_start + i_virt);
+    vmm_map_page(boot_info->fb_start + i_virt, boot_info->fb_phy_start + i_virt,
+                 PML_USER_ACCESS);
   }
 
   /* Allocate page for kernel heap region */
   uint32_t heap_size = (boot_info->heap_end - boot_info->heap_start);
   for (uint32_t i_virt = 0; i_virt < heap_size; i_virt += PAGE_SIZE) {
-    vmm_create_page(boot_info->heap_start + i_virt, PML_KERNEL_ACCESS);
+    vmm_create_page(boot_info->heap_start + i_virt, PML_USER_ACCESS);
   }
 
   vmm_set_directory(k_pdir, k_phy_pdir);

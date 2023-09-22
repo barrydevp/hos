@@ -35,6 +35,10 @@ typedef struct boot_info_t {
   /// kernel size.
   uint32_t kernel_size;
 
+  /// memory info
+  uint32_t highest_address;
+  uint32_t addressable_size;
+
   /// Address after the modules.
   uint32_t module_end;
 
@@ -53,8 +57,6 @@ typedef struct boot_info_t {
   uint32_t lowmem_start;
   /// lowmem addressable end
   uint32_t lowmem_end;
-  /// lowmem addressable current
-  uint32_t lowmem_current;
 
   /// stack end (comes after lowmem_end, and is the end of the low mapped memory)
   uint32_t stack_end;
@@ -73,6 +75,17 @@ typedef struct boot_info_t {
   uint32_t highmem_phy_start;
   /// highmem addressable end
   uint32_t highmem_phy_end;
+
+  /// framebuffer phy address start
+  uint32_t fb_phy_start;
+  /// framebuffer phy address end
+  uint32_t fb_phy_end;
+  /// framebuffer address start
+  uint32_t fb_start;
+  /// framebuffer address end
+  uint32_t fb_end;
+  /// framebuffer multiboot type
+  uint8_t fb_type;
 
   /// multiboot info
   struct multiboot_info *multiboot_header;

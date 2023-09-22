@@ -318,10 +318,10 @@ void pmm_init(struct boot_info_t *boot_info) {
   // memsize = (meminfo->mem_lower + meminfo->mem_upper) * 1024;
   struct multiboot_tag_mmap *tag_mmap = mboot->multiboot_mmap;
 
-  memsize = boot_info->highmem_phy_end;
+  memsize = boot_info->highest_address;
 
-  uint32_t lowmem_phy_start = boot_info->lowmem_phy_start;
-  uint32_t lowmem_start = boot_info->lowmem_start;
+  uint32_t addressable_phy = FRAME_ALIGN(boot_info->kernel_phy_end);
+  uint32_t addressable = FRAME_ALIGN(boot_info->kernel_end);
 
   /* Setup page allocator frames bitmap */
   max_frames = (memsize >> FRAME_SHIFT) + 1;
@@ -338,11 +338,11 @@ void pmm_init(struct boot_info_t *boot_info) {
   // and the size of bitmap for 4GB memory is 128KB so if 3MB is not enough
   // for those we must increase them in bootstrap.S or (maybe use another approach?
   // that setup an temporary paging after boot)
-  frames_bitmap = (uint32_t *)FRAME_ALIGN(lowmem_start);
+  frames_bitmap = (uint32_t *)(addressable);
   /* Mark all frames as used */
   memset((void *)frames_bitmap, 0xFF, frames_bitmap_size);
-  lowmem_phy_start += frames_bitmap_size;
-  lowmem_start += frames_bitmap_size;
+  addressable_phy += frames_bitmap_size;
+  addressable += frames_bitmap_size;
 
   /* Map valid memory into bitmap - memory region initialization */
   multiboot_memory_map_t *mmap = tag_mmap->entries;
@@ -366,9 +366,10 @@ void pmm_init(struct boot_info_t *boot_info) {
   pmm_deinit_region(0x0, boot_info->bootloader_phy_end);
   // running-kernel region
   pmm_deinit_region(boot_info->kernel_phy_start, boot_info->kernel_phy_end);
-
-  /* Now mark everything up to current start of lowmem as in use */
-  pmm_deinit_region(boot_info->lowmem_phy_start, lowmem_phy_start);
+  /* Now mark everything up to addressable_phy as in use */
+  pmm_deinit_region(boot_info->kernel_phy_end, addressable_phy);
+  // framebuffer region
+  pmm_deinit_region(boot_info->fb_phy_start, boot_info->fb_phy_end);
 
   /* Count available and used frames */
   for (uint32_t i = 0; i < FRAME_INDEX(max_frames); ++i) {

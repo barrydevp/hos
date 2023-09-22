@@ -1,245 +1,145 @@
 #include <kernel/drivers/vga.h>
-#include <arch/i386/ports.h>
-#include <arch/i386/cpu.h>
-#include <kernel/string.h>
+#include <kernel/drivers/vga/ega.h>
+#include <kernel/drivers/vga/fb.h>
 
-// misc
-#define VIDEO_INDEX(x, y) (x) * 2 + (y)*VGA_COLS * 2
+#include <kernel/printf.h>
 
-// keep track of cursor positions
-static uint8_t x_pos = 0, y_pos = 0;
-static uint8_t screen_color = 0;
-static uint8_t saved_x_pos = 0;
+typedef void (*vga_init_t)(boot_info_t *boot_info);
+typedef void (*vga_finalize_t)();
+typedef void (*vga_update_t)();
+typedef void (*vga_putc_t)(int c);
+typedef void (*vga_puts_t)(const char *str);
+typedef void (*vga_set_cursor_auto_t)();
+typedef void (*vga_move_cursor_t)(unsigned int x, unsigned int y);
+typedef void (*vga_get_cursor_position_t)(unsigned int *x, unsigned int *y);
+typedef void (*vga_get_screen_size_t)(unsigned int *width,
+                                      unsigned int *height);
+typedef void (*vga_clear_t)();
+typedef void (*vga_new_line_t)();
+typedef void (*vga_cartridge_return_t)();
+typedef void (*vga_shift_one_line_up_t)();
+typedef void (*vga_shift_one_page_up_t)();
+typedef void (*vga_shift_one_page_down_t)();
 
-void vga_clr(const uint8_t c) {
-  uint8_t *video = (unsigned char *)VGA_MEMORY;
+typedef struct {
+  bool is_init;
 
-  // clear out each index with our character and attribute byte
-  for (uint32_t i = 0; i < VGA_COLS * VGA_ROWS * 2; i += 2) {
-    video[i] = c;
-    video[i + 1] = screen_color;
-  }
+  /* VGA operations */
+  vga_init_t init;
+  vga_finalize_t finalize;
+  vga_update_t update;
+  vga_putc_t putc;
+  vga_puts_t puts;
+  // vga_set_cursor_auto_t set_cursor_auto;
+  vga_move_cursor_t move_cursor;
+  vga_get_cursor_position_t get_cursor_position;
+  vga_get_screen_size_t get_screen_size;
+  vga_clear_t clear;
+  vga_new_line_t new_line;
+  // vga_cartridge_return_t cartridge_return;
+  // vga_shift_one_line_up_t shift_one_line_up;
+  // vga_shift_one_page_up_t shift_one_page_up;
+  // vga_shift_one_page_down_t shift_one_page_down;
 
-  // reset cursor
-  x_pos = 0;
-  y_pos = 0;
+} vga_driver_t;
 
-  vga_set_cursor(x_pos, y_pos);
-}
+static vga_driver_t *driver = NULL;
 
-void vga_scroll() {
-  uint8_t *video = (unsigned char *)VGA_MEMORY;
+static vga_driver_t driver_ega = {
+  .is_init = false,
+  .init = ega_init,
+  .finalize = ega_finalize,
+  .update = ega_update,
+  .putc = ega_putc,
+  .puts = ega_puts,
+  .move_cursor = ega_move_cursor,
+  .get_cursor_position = ega_get_cursor_position,
+  .get_screen_size = ega_get_screen_size,
+  .clear = ega_clear,
+  .new_line = ega_new_line,
+};
 
-  // move VGA_COLS up
-  for (int i = 1; i < VGA_ROWS; i++) {
-    for (int j = 0; j < VGA_COLS; j++) {
-      video[VIDEO_INDEX(j, i - 1)] = video[VIDEO_INDEX(j, i)];
-      video[VIDEO_INDEX(j, i - 1) + 1] = video[VIDEO_INDEX(j, i) + 1];
-    }
-  }
+static vga_driver_t driver_fb = {
+  .is_init = false,
+  .init = fb_init,
+  .finalize = fb_finalize,
+  .update = fb_update,
+  .putc = fb_putc,
+  .puts = fb_puts,
+  .move_cursor = fb_move_cursor,
+  .get_cursor_position = fb_get_cursor_position,
+  .get_screen_size = fb_get_screen_size,
+  .clear = fb_clear,
+  .new_line = fb_new_line,
+};
 
-  // now clear the last line
-  for (int i = 0; i < VGA_COLS; i++) {
-    video[VIDEO_INDEX(i, VGA_ROWS - 1)] = VGA_BLANK_CHAR;
-    video[VIDEO_INDEX(i, VGA_ROWS - 1) + 1] = screen_color;
-  }
-
-  // FIXME: if y_pos > VGA_ROWS, what now?
-  y_pos = y_pos - 1;
-}
-
-/** adjust the position when it go beyond the frame */
-inline void vga_adjust_position() {
-  if (x_pos >= VGA_COLS) {
-    x_pos = 0;
-    y_pos++;
-  }
-
-  if (y_pos >= VGA_ROWS) {
-    vga_scroll();
-  }
-}
-
-void vga_putc(const char c) {
-  if (c == '\0') {
-    return;
-  }
-
-  // encounter newline, move to update cursor
-  if (c == '\n' || c == '\r') {
-    vga_newline();
-  } else if (c == '\t') {
-    vga_tab();
-  } else if (c == '\b') {
-    vga_backspace();
-  } else {
-    // offset to the correct memory address and
-    // set the character and the attribute byte
-    uint8_t *video = (unsigned char *)VGA_MEMORY;
-    video[VIDEO_INDEX(x_pos, y_pos)] = (uint8_t)c;
-    video[VIDEO_INDEX(x_pos, y_pos) + 1] = screen_color;
-
-    x_pos++;
-    vga_adjust_position();
-  }
-
-  vga_set_cursor(x_pos, y_pos);
-}
-
-inline void vga_newline() {
-  uint8_t *video = (unsigned char *)VGA_MEMORY;
-
-  // fill blank to the end of line
-  for (uint32_t i = 0; i < VGA_COLS - x_pos; i++) {
-    video[VIDEO_INDEX(x_pos + i, y_pos)] = VGA_BLANK_CHAR;
-    video[VIDEO_INDEX(x_pos + i, y_pos) + 1] = screen_color;
-  }
-
-  // reset cursor to next line
-  x_pos = 0;
-  y_pos++;
-  vga_adjust_position();
-}
-
-inline void vga_tab() {
-  uint8_t *video = (unsigned char *)VGA_MEMORY;
-
-  // if the middle of a tab reach to the end of line => need a newline
-  if ((VGA_COLS <= x_pos + VGA_TAB_SIZE) && (VGA_ROWS <= y_pos + 1)) {
-    // save x_pos because vga_newline() may modify it
-    uint8_t prv_x = x_pos;
-
-    // the start part of a tab
-    for (uint8_t i = 0; i < VGA_COLS - prv_x; i += 1) {
-      video[VIDEO_INDEX(x_pos + i, y_pos)] = VGA_BLANK_CHAR;
-      video[VIDEO_INDEX(x_pos + i, y_pos) + 1] = screen_color;
-    }
-
-    x_pos = 0;
-    y_pos++;
-    vga_adjust_position();
-
-    // the end part of a tab
-    for (uint8_t i = 0; i < VGA_TAB_SIZE - VGA_COLS + prv_x; i += 1) {
-      video[VIDEO_INDEX(i, y_pos)] = VGA_BLANK_CHAR;
-      video[VIDEO_INDEX(i, y_pos) + 1] = screen_color;
-    }
-
-    x_pos = VGA_TAB_SIZE - VGA_COLS + prv_x;
-    y_pos++;
-  } else {
-    // otherwise just go ahead filling a tab
-    for (uint8_t i = 0; i < VGA_TAB_SIZE; i += 1) {
-      video[VIDEO_INDEX(x_pos + i, y_pos)] = VGA_BLANK_CHAR;
-      video[VIDEO_INDEX(x_pos + i, y_pos) + 1] = screen_color;
-    }
-
-    x_pos += VGA_TAB_SIZE;
-    vga_adjust_position();
-  }
-}
-
-inline void vga_backspace() {
-  uint8_t x = vga_get_x();
-  uint8_t y = vga_get_y();
-
-  //go to previous line
-  if (x == 0) {
-    /*
-		uint8_t y = vga_get_y();
-		if(y == 0)
-		{
-			//do nothing if we are at top
-		}
-		else
-		{
-			//go to previous last line and find the a character that is not a space
-			x = VGA_COLS - 1;
-			y--;
-    			uint8_t* video = (uint8_t*)VGA_MEMORY;
-	    		video += x * 2 + y * VGA_COLS * 2;
-			while(x > 0 && *video == ' ')
-			{
-				x--;
-				video -= 2;
-			}
-			x++;
-
-			vga_go_to_pixel(x, y);
-		}
-		*/
-  }
-  //move back a space
-  else {
-    vga_goto_xy((uint8_t)((int)x - 1), y);
-  }
-
-  //get updated values
-  x = vga_get_x();
-  y = vga_get_y();
-
-  //print a space at the current location
-  uint8_t *video = (unsigned char *)VGA_MEMORY;
-  video += x * 2 + y * VGA_COLS * 2;
-  *video++ = ' ';
-  *video = screen_color;
-}
-
-void vga_puts(char *str) {
-  for (char *c = str; *c != '\0'; c++) {
-    vga_putc(*c);
-  }
-}
-
-void vga_set_color(const uint8_t color) {
-  screen_color = color;
-}
-
-void vga_goto_xy(const uint8_t x, const uint8_t y) {
-  //check out of bounds
-  if (x >= VGA_COLS || y >= VGA_ROWS) {
-    return;
-  }
-
-  saved_x_pos = 0;
-  x_pos = x;
-  y_pos = y;
-  vga_set_cursor(x_pos, y_pos);
-}
-
-uint8_t vga_get_x() {
-  return x_pos;
-}
-
-uint8_t vga_get_y() {
-  return y_pos;
-}
-
-void vga_set_cursor(const uint8_t x, const uint8_t y) {
-  uint16_t location =
-    (uint16_t)((uint32_t)VGA_COLS * (uint32_t)y + (uint32_t)x);
-
-  // disable_interrupts();
-
-  /** The Index Register is mapped to ports 0x3D5 or 0x3B5.
-    * The Data Register is mapped to ports 0x3D4 or 0x3B4. 
-    */
-
-  /** write high byte */
-  outportb(0x3D4, 14); // 14 = 0xE = CRT_Cursor_Location_High
-  outportb(0x3D5, (uint8_t)(location >> 8));
-
-  /** write low byte */
-  outportb(0x3D4, 15); // 15 = oxF = CRT_Cursor_Location_Low
-  outportb(0x3D5, (uint8_t)(location & 0x00FF));
-
-  // enable_interrupts();
+void vga_early_init() {
+  // TODO: change to console writer
+  driver = &driver_ega;
+  driver->clear();
 }
 
 void vga_init(boot_info_t *boot_info) {
-  // struct multiboot_tag_framebuffer *fb =
-  //   boot_info->multiboot_header->multiboot_framebuffer;
-  // uint32_t addr = fb->common.framebuffer_addr;
+  if (boot_info->fb_type == FRAMEBUFFER_TYPE_EGA_TEXT) {
+    dprintf("here--->");
+    // EGA 80x25 text mode
+    driver = &driver_ega;
+  } else {
+    // framebuffer supported
+    driver = &driver_fb;
+  }
 
-  vga_clr(0);
+  driver->init(boot_info);
 }
+
+void vga_finalize() {
+  driver->finalize();
+}
+
+void vga_update() {
+  driver->update();
+}
+
+void vga_putc(int c) {
+  driver->putc(c);
+}
+
+void vga_puts(const char *str) {
+  driver->puts(str);
+}
+
+void vga_move_cursor(unsigned int x, unsigned int y) {
+  driver->move_cursor(x, y);
+}
+
+void vga_get_cursor_position(unsigned int *x, unsigned int *y) {
+  driver->get_cursor_position(x, y);
+}
+
+void vga_get_screen_size(unsigned int *width, unsigned int *height) {
+  driver->get_screen_size(width, height);
+}
+
+void vga_clear() {
+  driver->clear();
+}
+
+void vga_new_line() {
+  driver->new_line();
+}
+
+// void vga_cartridge_return() {
+//   driver->vga_cartridge_return();
+// }
+
+// void vga_shift_one_line_up(void) {
+//   driver->shift_one_line_up();
+// }
+
+// void vga_shift_one_page_up() {
+//   driver->shift_one_page_up();
+// }
+
+// void vga_shift_one_page_down(void) {
+//   driver->shift_one_page_down();
+// }

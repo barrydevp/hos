@@ -1,48 +1,64 @@
 #pragma once
 
-#include <kernel/types.h>
 #include <kernel/boot.h>
 
-// start of video memory
-#define VGA_MEMORY 0xB8000
+#define FRAMEBUFFER_TYPE_INDEXED 0
+#define FRAMEBUFFER_TYPE_RGB 1
+#define FRAMEBUFFER_TYPE_EGA_TEXT 2
 
-// number of columns and rows in vga
-#define VGA_COLS 80
-#define VGA_ROWS 25
+/// @brief Early initializes the VGA right after boot.
+void vga_early_init();
 
-// misc
-#define VGA_BLANK_CHAR ' '
-#define VGA_TAB_SIZE 4
-
-// color attribute
-#define VGA_BLACK 0
-#define VGA_BLUE 1
-#define VGA_GREEN 2
-#define VGA_CYAN 3
-#define VGA_RED 4
-#define VGA_MAGENTA 5
-#define VGA_BROWN 6
-#define VGA_GREY 7
-#define VGA_DARK_GREY 8
-#define VGA_BRIGHT_BLUE 9
-#define VGA_BRIGHT_GREEN 10
-#define VGA_BRIGHT_CYAN 11
-#define VGA_BRIGHT_RED 12
-#define VGA_BRIGHT_MAGENTA 13
-#define VGA_YELLOW 14
-#define VGA_WHITE 15
-
+/// @brief Initializes the VGA.
 void vga_init(boot_info_t *boot_info);
 
-void vga_clr(const uint8_t character);
-void vga_putc(const char character);
-inline void vga_backspace();
-inline void vga_newline();
-inline void vga_tab();
-void vga_puts(char *str);
+/// @brief Finalizes the VGA.
+void vga_finalize();
 
-void vga_set_color(const uint8_t color);
-void vga_goto_xy(const uint8_t x, const uint8_t y);
-uint8_t vga_get_x();
-uint8_t vga_get_y();
-void vga_set_cursor(const uint8_t x, const uint8_t y);
+/// @brief Updates the video.
+void vga_update();
+
+/// @brief Print the given character on the screen.
+/// @param c The character to print.
+void vga_putc(int c);
+
+/// @brief Prints the given string on the screen.
+/// @param str The string to print.
+void vga_puts(const char *str);
+
+/// @brief When something is written in another position, update the cursor.
+void vga_set_cursor_auto();
+
+/// @brief Move the cursor at the position x, y on the screen.
+/// @param x The x coordinate.
+/// @param y The y coordinate.
+void vga_move_cursor(unsigned int x, unsigned int y);
+
+/// @brief Returns cursor's position on the screen.
+/// @param x The output x coordinate.
+/// @param y The output y coordinate.
+void vga_get_cursor_position(unsigned int *x, unsigned int *y);
+
+/// @brief Returns screen size.
+/// @param width The screen width.
+/// @param height The screen height.
+void vga_get_screen_size(unsigned int *width, unsigned int *height);
+
+/// @brief Clears the screen.
+void vga_clear();
+
+/// @brief Move to the following line (the effect of \n character).
+void vga_new_line();
+
+/// @brief Move to the up line (the effect of \n character).
+void vga_cartridge_return();
+
+/// @brief The whole screen is shifted up by one line. Used when the cursor
+///        reaches the last position of the screen.
+void vga_shift_one_line_up();
+
+/// @brief The whole screen is shifted up by one page.
+void vga_shift_one_page_up();
+
+/// @brief The whole screen is shifted down by one page.
+void vga_shift_one_page_down();

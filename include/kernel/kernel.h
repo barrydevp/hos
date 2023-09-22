@@ -30,6 +30,7 @@ extern void *_kernel_end;
 #define KERNEL_HEAP_START 0xD0000000
 #define USER_HEAP_START 0x00000000
 #define USER_HEAP_END 0x40000000
+#define FRAMEBUFFER_START KERNEL_HEAP_END
 
 #define KERNEL_PDE_START 768 // virtAddress from 0xC0000000
 #define KERNEL_INIT_NPDE 1 // we use one PDE mean one page table (4MB)

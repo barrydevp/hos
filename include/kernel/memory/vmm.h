@@ -184,6 +184,7 @@ void vmm_page_free(union PML *page);
 void vmm_ptable_allocate(union PML *pde, uint32_t flags);
 
 union PML *vmm_create_page(uintptr_t virtAddr, int flags);
+union PML *vmm_map_page(uintptr_t virtAddr, uintptr_t physAddr, int flags);
 
 page_directory_t *vmm_get_kernel_directory(void);
 page_directory_t *vmm_get_directory(void);

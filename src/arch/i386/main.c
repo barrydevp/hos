@@ -19,7 +19,9 @@
 static struct boot_info_t boot_info;
 
 int kenter(uint32_t magic, uint32_t addr) {
-  vga_init(&boot_info);
+  // VGA early init for logging
+  vga_early_init();
+
   // Init multiboot structure
   multiboot_init(magic, addr);
 
@@ -38,72 +40,77 @@ int kenter(uint32_t magic, uint32_t addr) {
   boot_info.kernel_size = KERNEL_START - KERNEL_END;
 
   // Get the maximum memory
-  uint32_t highest_addr =
-    get_highest_valid_address(mboot.multiboot_meminfo, mboot.multiboot_mmap);
+  uint32_t highest_address = 0;
+  uint32_t addressable_size = 0;
+  load_memory_info(&highest_address, &addressable_size);
+  boot_info.highest_address = highest_address;
+  boot_info.addressable_size = addressable_size;
 
-  // Get the addresses of lowmem and highmem zones.
-  boot_info.lowmem_phy_start = __ALIGN_UP(boot_info.kernel_phy_end, PAGE_SIZE);
-  boot_info.lowmem_phy_end = 896 * MB; // 896 MB of low memory max
-  if (boot_info.lowmem_phy_end > highest_addr) {
-    dprintf("Low lowmem region:\n"
-            " available: 0x%p, size: %uGB %uMB %uKB\n"
-            " desired: 0x%p, size: %uGB %uMB %uKB\n",
-            highest_addr, highest_addr / GB, highest_addr / MB,
-            highest_addr / KB, boot_info.lowmem_phy_end,
-            boot_info.lowmem_phy_end / GB, boot_info.lowmem_phy_end / MB,
-            boot_info.lowmem_phy_end / KB);
-    dprintf("-> Zero space highmem region!\n");
-    boot_info.lowmem_phy_end = highest_addr;
+  // 128 KB reserve for frame bit map for 32 bit address space
+  uint32_t reserved_size = 128 * KB;
+  addressable_size -= reserved_size;
+
+  // framebuffer region
+  // TODO: move to multiboot.c function
+  struct multiboot_tag_framebuffer *fb = mboot.multiboot_framebuffer;
+  if (fb &&
+      fb->common.framebuffer_type != MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT) {
+    // framebuffer support
+    boot_info.fb_type = fb->common.framebuffer_type;
+    struct multiboot_tag_framebuffer_common *fbc = &fb->common;
+    boot_info.fb_phy_start = fbc->framebuffer_addr;
+    boot_info.fb_phy_end = fbc->framebuffer_addr +
+                           fbc->framebuffer_width * fbc->framebuffer_bpp +
+                           fbc->framebuffer_height * fbc->framebuffer_pitch;
+  } else {
+    // EGA text mode
+    boot_info.fb_type = FRAMEBUFFER_TYPE_EGA_TEXT;
+    boot_info.fb_phy_start = 0xB8000;
+    boot_info.fb_phy_end = 0xB8000 + 80 * 25 * 2;
   }
-  uint32_t lowmem_size = boot_info.lowmem_phy_end - boot_info.lowmem_phy_start;
-
-  boot_info.lowmem_start = __ALIGN_UP(boot_info.kernel_end, PAGE_SIZE);
-  boot_info.lowmem_end = boot_info.lowmem_start + lowmem_size;
-
-  boot_info.highmem_phy_start = boot_info.lowmem_phy_end;
-  boot_info.highmem_phy_end = highest_addr;
-  boot_info.stack_end = boot_info.lowmem_end;
+  uint32_t fb_size = boot_info.fb_phy_end - boot_info.fb_phy_start;
+  // framebuffer virtual region
+  boot_info.fb_start = FRAMEBUFFER_START;
+  boot_info.fb_end = boot_info.fb_start + fb_size;
 
   // Reserve space for the kernel stack at the end of lowmem.
   boot_info.stack_base = KERNEL_STACK_TOP;
-  boot_info.lowmem_phy_end = boot_info.lowmem_phy_end - KERNEL_STACK_SIZE;
-  boot_info.lowmem_end = boot_info.lowmem_end - KERNEL_STACK_SIZE;
-  boot_info.lowmem_current = boot_info.lowmem_start;
 
   // Reserve space for kernel heap
   boot_info.heap_start = KERNEL_HEAP_START;
   boot_info.heap_end = KERNEL_HEAP_END;
   uint32_t heap_size = boot_info.heap_end - boot_info.heap_start;
-  // 128 KB reserve for frame bit map for 32 bit address space
-  uint32_t lowmem_reserved = 128 * KB;
-  if (heap_size > (lowmem_size - lowmem_reserved)) {
+  if (heap_size > addressable_size) {
     dprintf("Low kernel heap memory:\n"
             " available: %uKB\n"
             " desired: %uKB\n",
-            __ALIGN_DOWN(lowmem_size - lowmem_reserved, PAGE_SIZE) / KB,
-            heap_size / KB);
-    boot_info.heap_end = boot_info.heap_start +
-                         __ALIGN_DOWN(lowmem_size - lowmem_reserved, PAGE_SIZE);
+            __ALIGN_DOWN(addressable_size, PAGE_SIZE) / KB, heap_size / KB);
+    boot_info.heap_end =
+      boot_info.heap_start + __ALIGN_DOWN(addressable_size, PAGE_SIZE);
     heap_size = boot_info.heap_end - boot_info.heap_start;
   }
+
   dprintf("Memory summary: \n"
           " total: %uGB + %uMB + %uKB\n"
-          " lowmem: phy=0x%p virt=0x%p (%uKB)\n"
-          " heap: virt=0x%p (%uKB)\n",
-          highest_addr / GB, (highest_addr % GB) / MB,
-          ((highest_addr % GB) % MB) / KB, boot_info.lowmem_phy_start,
-          boot_info.lowmem_start, lowmem_size / KB, boot_info.heap_start,
-          heap_size / KB);
+          " heap: virt=0x%p (%uKB)\n"
+          " framebuffer: phy=0x%p virt=0x%p type=%u (%uKB)\n",
+          highest_address / GB, (highest_address % GB) / MB,
+          ((highest_address % GB) % MB) / KB, boot_info.heap_start,
+          heap_size / KB, boot_info.fb_phy_start, boot_info.fb_start,
+          (unsigned)boot_info.fb_type, fb_size / KB);
 
   // Initialization
-  gdt_init();
-  tss_init(5, 0x10);
-  idt_init();
   pmm_init(&boot_info);
   vmm_init(&boot_info);
   mmu_init(&boot_info);
+
+  gdt_init();
+  tss_init(5, 0x10);
+  idt_init();
   pic_init();
   pit_init();
+
+  vga_init(&boot_info);
 
   enable_interrupts();
 
