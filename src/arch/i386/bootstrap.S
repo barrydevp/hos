@@ -72,30 +72,23 @@ mb2_tag_fb_end:
 multiboot2_header_end:
 
 # Allocate the initial stack.
-.section .bootstrap_stack, "aw", @nobits
-stack_bottom:
+.section .kernel_stack, "aw", @nobits
+.global _kernel_stack_bottom
+_kernel_stack_bottom:
 .skip 16384 # 16 KiB
-stack_top:
-
-# Preallocate pages used for paging. Don't hard-code addresses and assume they
-# are available, as the bootloader might have loaded its multiboot structures or
-# modules there. This lets the bootloader know it must avoid the addresses.
-.section .bss, "aw", @nobits
-.align 4096
-boot_page_directory:
-.skip 4096
-boot_page_table1:
-.skip 4096
-# Further page tables may be required if the kernel grows beyond 3 MiB.
+.global _kernel_stack_top
+_kernel_stack_top:
 
 # The kernel entry point.
 .section .multiboot.text, "a"
 .global _start
 .type _start, @function
 _start:
-
-	# Set up the stack.
-	mov $stack_top, %esp
+	# Set up the stack. Since paging is not enable yet
+	# we need to store the real physical addr of stack
+	# later after enable paging, we set it back to higher
+	# half address
+	mov $(_kernel_stack_top - KERNEL_HIGHER_HAFL), %esp
 	/* Make sure our stack is 16-byte aligned */
 	and $-16, %esp
 
@@ -171,8 +164,13 @@ start_hihger_half:
 	movl %cr3, %ecx
 	movl %ecx, %cr3
 
+	# We set the stack back to higher half 
+	mov %esp, %eax
+	add $KERNEL_HIGHER_HAFL, %eax
+	mov %eax, %esp
+
 	# Enter the high-level kernel.
-  # at this point, multiboot magic and pointer has already pushed
+	# at this point, multiboot magic and pointer has already pushed
 	# when first jump to _start, so free to enter the kernel entry
 	# call kenerl entry point
 	call kenter

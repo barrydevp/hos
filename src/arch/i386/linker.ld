@@ -11,7 +11,6 @@ SECTIONS
 
 	.multiboot.data : {
 		*(.multiboot.data)
-		*(.bootstrap_stack)
 	}
 
 	.multiboot.text : {
@@ -52,6 +51,7 @@ SECTIONS
 	{
 		*(COMMON)
 		*(.bss .bss.*)
+		*(.kernel_stack)
 	}
 	/* Add a symbol that indicates the end address of the kernel. */
 	_kernel_end = .;

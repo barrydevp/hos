@@ -157,12 +157,6 @@ uintptr_t get_highest_valid_address(struct multiboot_tag_basic_meminfo *meminfo,
 
   while ((multiboot_uint8_t *)mmap <
          (multiboot_uint8_t *)tag_mmap + tag_mmap->size) {
-    printf(" base_addr = 0x%x%x,"
-           " length = 0x%x%x, type = 0x%x\n",
-           (unsigned)(mmap->addr >> 32), (unsigned)(mmap->addr & 0xffffffff),
-           (unsigned)(mmap->len >> 32), (unsigned)(mmap->len & 0xffffffff),
-           (unsigned)mmap->type);
-
     if (mmap->type == 1 && mmap->len &&
         mmap->addr + mmap->len - 1 > highest_address) {
       highest_address = (uintptr_t)mmap->addr + mmap->len - 1;

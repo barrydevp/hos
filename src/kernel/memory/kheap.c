@@ -2,6 +2,7 @@
 #include <kernel/memory/vmm.h>
 #include <kernel/assert.h>
 #include <kernel/string.h>
+#include <kernel/printf.h>
 
 /// Overhead given by the block_t itself.
 #define OVERHEAD sizeof(block_t)
@@ -674,30 +675,6 @@ static void __do_free(vm_area_struct_t *heap, void *ptr) {
   }
 }
 
-void kheap_init(boot_info_t *boot_info) {
-  // Kernel_heap_start.
-  kernel_heap.vm_start = boot_info->heap_start;
-  kernel_heap.vm_end = boot_info->heap_end;
-
-  // Kernel_heap_start.
-  kernel_heap_top = kernel_heap.vm_start;
-
-  // FIXME!!
-  // Set kernel_heap vm_area_struct info:
-  //    kernel_heap.vm_next = NULL;
-  //    kernel_heap.vm_mm = NULL;
-
-  // Reserved space for:
-  // 1) First memory block.
-  // static block_t *head = NULL;
-  // 2) Last memory block.
-  // static block_t *tail = NULL;
-  // 3) All the memory blocks that are freed.
-  // static block_t *freelist = NULL;
-  memset((void *)kernel_heap_top, 0, 3 * sizeof(block_t *));
-  kernel_heap_top += 3 * sizeof(block_t *);
-}
-
 // // TODO: rename in sys_brk
 // void *umalloc(unsigned int size) {
 //   // Get user heap segment structure.
@@ -840,10 +817,10 @@ void kheap_dump() {
   uint32_t total_overhead = 0;
   block_t *it = head_block;
   while (it) {
-    // pr_debug("[%c] %12u (%12u)   from 0x%p to 0x%p\n",
-    //          (block_is_free(it)) ? 'F' : 'A', block_get_real_size(it->size),
-    //          it->size, it,
-    //          (char *)it + OVERHEAD + block_get_real_size(it->size));
+    dprintf("[%c] %12u (%12u)   from 0x%p to 0x%p\n",
+             (block_is_free(it)) ? 'F' : 'A', block_get_real_size(it->size),
+             it->size, it,
+             (char *)it + OVERHEAD + block_get_real_size(it->size));
     total += block_get_real_size(it->size);
     total_overhead += OVERHEAD;
     it = it->next;
@@ -858,3 +835,28 @@ void kheap_dump() {
   // pr_debug("\n\n");
   (void)total, (void)total_overhead;
 }
+
+void kheap_init(boot_info_t *boot_info) {
+  // Kernel_heap_start.
+  kernel_heap.vm_start = boot_info->heap_start;
+  kernel_heap.vm_end = boot_info->heap_end;
+
+  // Kernel_heap_start.
+  kernel_heap_top = kernel_heap.vm_start;
+
+  // FIXME!!
+  // Set kernel_heap vm_area_struct info:
+  //    kernel_heap.vm_next = NULL;
+  //    kernel_heap.vm_mm = NULL;
+
+  // Reserved space for:
+  // 1) First memory block.
+  // static block_t *head = NULL;
+  // 2) Last memory block.
+  // static block_t *tail = NULL;
+  // 3) All the memory blocks that are freed.
+  // static block_t *freelist = NULL;
+  memset((void *)kernel_heap_top, 0, 3 * sizeof(block_t *));
+  kernel_heap_top += 3 * sizeof(block_t *);
+}
+

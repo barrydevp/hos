@@ -68,6 +68,7 @@ ARCH_HDRS += $(wildcard include/arch/${ARCH}/*/*.h)
 # MODULES = $(patsubst modules/%.c,$(BASE)/mod/%.ko,$(foreach mod,$(ARCH_ENABLED_MODS),modules/$(mod).c))
 
 EMU = qemu-system-${ARCH}
+EMU_FLAGS = -m 1096M
 
 APPS=$(patsubst $(SRC)/apps/%.c,%,$(wildcard apps/*.c))
 APPS_X=$(foreach app,$(APPS),$(BASE)/bin/$(app))
@@ -109,18 +110,18 @@ all-cd: qemu-c-kernel-debug
 PHONY += qemu-kernel qemu-c-kernel qemu-c-kernel-debug
 
 qemu-kernel: hos.kernel
-	qemu-system-i386 -nographic -curses -kernel $^
-	# qemu-system-i386 -kernel $^ -s -S
+	$(EMU) $(EMU_FLAGS) -nographic -curses -kernel $^
+	# $(EMU) $(EMU_FLAGS) -kernel $^ -s -S
 
 qemu-c-kernel: hos.iso
-	# qemu-system-i386 -nographic -curses -serial file:c.kernel.log -kernel $^
-	qemu-system-i386 -nographic -curses -serial file:c.kernel.log -cdrom $^
-	# qemu-system-i386 -nographic -curses -s -S -serial file:c.kernel.log -kernel $^
-	# qemu-system-i386 -kernel $^ -s -S -serial file:c.kernel.log
+	# $(EMU) $(EMU_FLAGS) -nographic -curses -serial file:c.kernel.log -kernel $^
+	$(EMU) $(EMU_FLAGS) -nographic -curses -serial file:c.kernel.log -cdrom $^
+	# $(EMU) $(EMU_FLAGS) -nographic -curses -s -S -serial file:c.kernel.log -kernel $^
+	# $(EMU) $(EMU_FLAGS) -kernel $^ -s -S -serial file:c.kernel.log
 
 qemu-c-kernel-debug: hos.iso
-	# qemu-system-i386 -nographic -curses -s -S -serial file:c.kernel.log -kernel $^
-	qemu-system-i386 -nographic -curses -s -S -serial file:c.kernel.log -cdrom $^
+	# $(EMU) $(EMU_FLAGS) -nographic -curses -s -S -serial file:c.kernel.log -kernel $^
+	$(EMU) $(EMU_FLAGS) -nographic -curses -s -S -serial file:c.kernel.log -cdrom $^
 
 PHONY += hos.bin
 

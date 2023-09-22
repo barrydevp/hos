@@ -9,6 +9,7 @@ extern void *_kernel_text_start;
 extern void *_kernel_text_end;
 extern void *_kernel_data_start;
 extern void *_kernel_data_end;
+extern void *_kernel_stack_top;
 extern void *_kernel_end;
 
 #define BOOTLOADER_START (uint32_t)(&_bootloader_start)
@@ -20,6 +21,7 @@ extern void *_kernel_end;
 #define KERNEL_TEXT_END (uint32_t)(&_kernel_text_end)
 #define KERNEL_DATA_START (uint32_t)(&_kernel_data_start)
 #define KERNEL_DATA_END (uint32_t)(&_kernel_data_end)
+#define KERNEL_STACK_TOP (uint32_t)(&_kernel_stack_top)
 #define KERNEL_END (uint32_t)(&_kernel_end)
 
 #define KERNEL_LOW_SIZE 896 // MB
@@ -33,8 +35,12 @@ extern void *_kernel_end;
 #define KERNEL_INIT_NPDE 1 // we use one PDE mean one page table (4MB)
 
 /** utilities */
-#define __ALIGN_UP(addr, aligned) (((addr) + (aligned-1)) & (~(aligned - 1)))
+#define __ALIGN_UP(addr, aligned) (((addr) + (aligned - 1)) & (~(aligned - 1)))
 #define __ALIGN_DOWN(addr, aligned) ((addr) & (~(aligned - 1)))
+
+#define KB (1024u)
+#define MB (1024u * 1024u)
+#define GB (1024u * 1024u * 1024u)
 
 /** method */
 

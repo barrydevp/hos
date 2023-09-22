@@ -1,7 +1,10 @@
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/vmm.h>
 #include <kernel/multiboot.h>
+#include <kernel/arch.h>
 #include <kernel/string.h>
+
+#include <kernel/printf.h>
 
 static uint32_t memsize = 0;
 static volatile uint32_t *frames_bitmap = NULL;
@@ -96,7 +99,7 @@ bool pmm_frame_test(uint32_t frame) {
 /**
  * @brief Find the first available frame from the bitmap.
  */
-int32_t pmm_first_free_frame() {
+uint32_t pmm_first_free_frame() {
   uint32_t i, j;
   for (i = FRAME_INDEX(lowest_available); i < FRAME_INDEX(max_frames); ++i) {
     // all bits are set (uint32_t)-1 = 0xFFFFFFFF
@@ -118,9 +121,7 @@ int32_t pmm_first_free_frame() {
       }
   }
 
-  // dprintf("Out of memory.\n");
-
-  return -1;
+  return 0;
 }
 
 /**
@@ -128,9 +129,9 @@ int32_t pmm_first_free_frame() {
  *
  * If a large enough region could not be found, results are fatal.
  */
-int32_t pmm_first_nfree_frames(size_t n) {
+uint32_t pmm_first_nfree_frames(size_t n) {
   if (n == 0)
-    return -1;
+    return 0;
 
   if (n == 1)
     return pmm_first_free_frame();
@@ -189,7 +190,7 @@ int32_t pmm_first_nfree_frames(size_t n) {
     }
   }
 
-  return -1;
+  return 0;
 }
 
 static inline void pmm_mark_frame_used(uint32_t frame) {
@@ -201,9 +202,12 @@ static inline uint32_t __pmm_allocate_frame(void) {
   // if (max_frames <= used_frames)
   //   return 0;
 
-  int frame = pmm_first_free_frame();
-  if (frame == -1)
+  uint32_t frame = pmm_first_free_frame();
+  if (frame == 0) {
+    dprintf("Out of memory.\n");
+    arch_fatal();
     return 0;
+  }
 
   pmm_mark_frame_used(frame);
 
@@ -225,9 +229,12 @@ static inline uint32_t __pmm_allocate_frames(size_t n) {
   // if (max_frames - used_frames < n)
   //   return 0;
 
-  int start_frame = pmm_first_nfree_frames(n);
-  if (start_frame == -1)
+  uint32_t start_frame = pmm_first_nfree_frames(n);
+  if (start_frame == 0) {
+    dprintf("Out of memory.\n");
+    arch_fatal();
     return 0;
+  }
 
   for (uint32_t i = 0; i < n; ++i) {
     pmm_mark_frame_used(start_frame + i);
@@ -311,14 +318,13 @@ void pmm_init(struct boot_info_t *boot_info) {
   // memsize = (meminfo->mem_lower + meminfo->mem_upper) * 1024;
   struct multiboot_tag_mmap *tag_mmap = mboot->multiboot_mmap;
 
-  memsize =
-    get_highest_valid_address(mboot->multiboot_meminfo, mboot->multiboot_mmap);
+  memsize = boot_info->highmem_phy_end;
 
   uint32_t lowmem_phy_start = boot_info->lowmem_phy_start;
   uint32_t lowmem_start = boot_info->lowmem_start;
 
   /* Setup page allocator frames bitmap */
-  used_frames = max_frames = (memsize >> FRAME_SHIFT) + 1;
+  max_frames = (memsize >> FRAME_SHIFT) + 1;
   frames_bitmap_size =
     (FRAME_INDEX(max_frames - 1) + 1) * sizeof(*frames_bitmap);
   // we want frames_bitmap frame(page) aligned, bitmap fully fit into n frames(pages),
@@ -373,14 +379,11 @@ void pmm_init(struct boot_info_t *boot_info) {
       }
     }
   }
-
-  /* Modify the start address of HEAP region if dedicated heap_start 
-   * is overlapped with the lowmem_current
-   */
-  if (boot_info->heap_start < lowmem_start) {
-    boot_info->heap_start = lowmem_start;
-  }
-  boot_info->lowmem_current = lowmem_start;
+  dprintf("PMM summary:\n"
+          " frames: max=%u used=%u free=%u\n"
+          " bitmap: virt=0x%p size=%u\n",
+          max_frames, used_frames, max_frames - used_frames, frames_bitmap,
+          frames_bitmap_size);
 
   // log("PMM: Done");
 }

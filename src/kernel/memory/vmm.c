@@ -2,6 +2,8 @@
 #include <kernel/memory/mmu.h>
 #include <kernel/string.h>
 
+#include <kernel/printf.h>
+
 #define get_page_directory_index(x) (((x) >> 22) & 0x3ff)
 #define get_page_table_entry_index(x) (((x) >> 12) & 0x3ff)
 #define get_aligned_address(x) (x & ~0xfff)
@@ -40,7 +42,7 @@ void vmm_invalidate(uintptr_t addr) {
 }
 
 static inline void vmm_page_set_flags(union PML *page, uint32_t flags) {
-  page->raw |= PAGE_LOW_MASK | flags;
+  page->raw |= PAGE_LOW_MASK & flags;
 }
 
 /**
@@ -188,8 +190,8 @@ page_directory_t *vmm_clone_pdir(page_directory_t *from) {
  */
 union PML *vmm_create_page(uintptr_t virtAddr, int flags) {
   uintptr_t pageAddr = virtAddr >> PAGE_SHIFT;
-  unsigned int pd_entry = (pageAddr >> 10) & ENTRY_MASK;
-  unsigned int pt_entry = (pageAddr)&ENTRY_MASK;
+  uint32_t pd_entry = (pageAddr >> 10) & ENTRY_MASK;
+  uint32_t pt_entry = (pageAddr)&ENTRY_MASK;
 
   page_directory_t *pd = vmm_get_directory();
   page_table_t *pt = vmm_r_get_ptable(virtAddr);
@@ -206,7 +208,7 @@ union PML *vmm_create_page(uintptr_t virtAddr, int flags) {
     return NULL;
   }
 
-  if (!pt->pages[pt_entry].pdbits.frame) {
+  if (!pt->pages[pt_entry].pdbits.present) {
     vmm_page_allocate(&pt->pages[pt_entry], flags);
     /* zero it */
     memset((void *)virtAddr, 0, PAGE_SIZE);
@@ -451,10 +453,16 @@ void vmm_init(struct boot_info_t *boot_info) {
   /* Recursive mapping */
   k_pdir->entries[1023].raw = (k_phy_pdir & PAGE_MASK) | PML_KERNEL_ACCESS;
 
-  /* Allocate page for lowmem + kernel stack region */
-  uint32_t lowmem_size = (boot_info->stack_base - boot_info->lowmem_start);
-  for (uint32_t i_virt = 0; i_virt < lowmem_size; i_virt += PAGE_SIZE) {
+  /* Allocate page for lowmem used region */
+  uint32_t lowmem_used = (boot_info->lowmem_current - boot_info->lowmem_start);
+  for (uint32_t i_virt = 0; i_virt < lowmem_used; i_virt += PAGE_SIZE) {
     vmm_create_page(boot_info->lowmem_start + i_virt, PML_KERNEL_ACCESS);
+  }
+
+  /* Allocate page for kernel heap region */
+  uint32_t heap_size = (boot_info->heap_end - boot_info->heap_start);
+  for (uint32_t i_virt = 0; i_virt < heap_size; i_virt += PAGE_SIZE) {
+    vmm_create_page(boot_info->heap_start + i_virt, PML_KERNEL_ACCESS);
   }
 
   vmm_set_directory(k_pdir, k_phy_pdir);
