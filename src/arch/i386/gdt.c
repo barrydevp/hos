@@ -1,7 +1,7 @@
 #include <arch/i386/gdt.h>
 #include <kernel/string.h>
 
-static struct gdt_descriptor gdt[MAX_DESCRIPTORS]; // 3 descriptors
+static struct gdt_descriptor gdt[MAX_DESCRIPTORS]; // 6 descriptors
 
 static struct gdtr gdtr; // one gdt register
 

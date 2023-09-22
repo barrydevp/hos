@@ -109,6 +109,9 @@ void idt_init() {
   idt_set_gate(46, irq14, 0x08, 0x8E);
   idt_set_gate(47, irq15, 0x08, 0x8E);
 
+  /* Legacy system call entry point, called by userspace. */
+  idt_set_gate(127, isr127, 0x08, 0x8E | 0x60);
+
   /** Flush the idtr register */
   idt_load((uint32_t)&idtr);
 }
@@ -124,21 +127,20 @@ static void panic(const char *desc, pt_regs *r, uint32_t faulting_address) {
   //                                      "kernel",
   //         faulting_address);
 
-  dprintf("\033[31mPanic!\033[0m %s (%s) at 0x%p\n", desc, "kernel", faulting_address);
+  dprintf("\033[31mPanic!\033[0m %s (%s) at 0x%p\n", desc, "kernel",
+          faulting_address);
   dprintf("Page fault: 0x%x\n", faulting_address);
 
-
   /* Dump register state */
-  dprintf(
-    "Registers at interrupt:\n"
-    "  $eip=0x%p\n"
-    "  $esi=0x%p,$edi=0x%p,$ebp=0x%p,$esp=0x%p\n"
-    "  $eax=0x%p,$ebx=0x%p,$ecx=0x%p,$edx=0x%p\n"
-    "  $gs=0x%p,$fs=0x%p,$es=0x%p,$ds=0x%p\n"
-    "  cs=0x%p ss=0x%p eflags=0x%p int=0x%x err=0x%x\n",
-    r->eip, r->esi, r->edi, r->ebp, r->esp, r->eax, r->ebx, r->ecx, r->edx,
-    r->gs, r->fs, r->es, r->ds, r->cs, r->ss, r->eflags, r->int_no,
-    r->err_code);
+  dprintf("Registers at interrupt:\n"
+          "  $eip=0x%p\n"
+          "  $esi=0x%p,$edi=0x%p,$ebp=0x%p,$esp=0x%p\n"
+          "  $eax=0x%p,$ebx=0x%p,$ecx=0x%p,$edx=0x%p\n"
+          "  $gs=0x%p,$fs=0x%p,$es=0x%p,$ds=0x%p\n"
+          "  cs=0x%p ss=0x%p eflags=0x%p int=0x%x err=0x%x\n",
+          r->eip, r->esi, r->edi, r->ebp, r->esp, r->eax, r->ebx, r->ecx,
+          r->edx, r->gs, r->fs, r->es, r->ds, r->cs, r->ss, r->eflags,
+          r->int_no, r->err_code);
 
   // /* Dump GS segment register information */
   // uint32_t gs_base_low, gs_base_high;
