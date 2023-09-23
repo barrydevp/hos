@@ -1,7 +1,7 @@
-#include <kernel/drivers/vga/fb.h>
-#include <kernel/drivers/vga/mode.h>
-#include <kernel/drivers/vga/palette.h>
-#include <kernel/drivers/vga/font.h>
+#include <kernel/drivers/video/vga.h>
+#include <kernel/drivers/video/mode.h>
+#include <kernel/drivers/video/palette.h>
+#include <kernel/drivers/video/font.h>
 
 #include <arch/i386/ports.h>
 #include <arch/i386/cpu.h>
@@ -46,8 +46,8 @@
 /// By reading this port it'll go to the index state.
 #define INPUT_STATUS_READ 0x03DA
 
-#define IS_MODE(_width, _height, _bpp) \
-  if (width == _width && height == _height && bpp == _bpp)
+#define IS_MODE(_width, _height, _colors) \
+  if (width == _width && height == _height && colors == _colors)
 
 /// VGA pointers for drawing operations.
 typedef struct {
@@ -59,15 +59,7 @@ typedef struct {
   void (*draw_rect)(int x, int y, int wd, int ht, unsigned char c);
   /// Fills a rectangle.
   void (*fill_rect)(int x, int y, int wd, int ht, unsigned char c);
-} fb_ops_t;
-
-/// VGA font details.
-typedef struct {
-  const unsigned char
-    *font; ///< Pointer to the array holding the shape of each character.
-  unsigned width; ///< Width of the font.
-  unsigned height; ///< Height of the font.
-} fb_font_t;
+} vga_ops_t;
 
 /// VGA driver details.
 typedef struct {
@@ -75,18 +67,18 @@ typedef struct {
   int height; ///< Screen's height.
   int bpp; ///< Bits per pixel (bpp).
   char *address; ///< Starting address of the screen.
-  fb_ops_t *ops; ///< Writing operations.
-  fb_font_t *font; ///< The current font.
-} fb_driver_t;
+  vga_ops_t *ops; ///< Writing operations.
+  video_font_t *font; ///< The current font.
+} vga_driver_t;
 
 /// Is VGA enabled.
-static bool fb_enable = false;
+static bool vga_enable = false;
 /// The stored palette.
 palette_entry_t stored_palette[256];
 /// A buffer for storing a copy of the video memory.
 char vidmem[262144];
 /// Current driver.
-static fb_driver_t *driver = NULL;
+static vga_driver_t *driver = NULL;
 
 // ============================================================================
 // == VGA MODEs ===============================================================
@@ -123,8 +115,8 @@ static inline char *__get_seg(void) {
 /// @param r red.
 /// @param g green.
 /// @param b blue.
-void __fb_set_color_map(unsigned int index, unsigned char r, unsigned char g,
-                        unsigned char b) {
+void __vga_set_color_map(unsigned int index, unsigned char r, unsigned char g,
+                         unsigned char b) {
   outportb(PALETTE_MASK, 0xFF);
   outportb(PALETTE_INDEX, index);
   outportl(PALETTE_DATA, r);
@@ -137,8 +129,8 @@ void __fb_set_color_map(unsigned int index, unsigned char r, unsigned char g,
 /// @param r output value for red.
 /// @param g output value for green.
 /// @param b output value for blue.
-void __fb_get_color_map(unsigned int index, unsigned char *r, unsigned char *g,
-                        unsigned char *b) {
+void __vga_get_color_map(unsigned int index, unsigned char *r, unsigned char *g,
+                         unsigned char *b) {
   outportb(PALETTE_MASK, 0xFF);
   outportb(PALETTE_READ, index);
   *r = inportl(PALETTE_DATA);
@@ -219,9 +211,9 @@ static void __write_byte(unsigned int offset, unsigned char value) {
 }
 
 /// @brief Sets the given mode.
-/// @param fb_mode the new mode we set.
-static void __set_mode(vga_mode_t *fb_mode) {
-  unsigned char *ptr = &fb_mode->misc;
+/// @param vga_mode the new mode we set.
+static void __set_mode(vga_mode_t *vga_mode) {
+  unsigned char *ptr = &vga_mode->misc;
 
   // Write SEQUENCER regs.
   outportb(MISC_WRITE, *ptr);
@@ -272,9 +264,9 @@ static void __set_mode(vga_mode_t *fb_mode) {
 }
 
 /// @brief Reads the VGA registers.
-/// @param fb_mode the current VGA mode.
-static void __read_registers(vga_mode_t *fb_mode) {
-  unsigned char *ptr = &fb_mode->misc;
+/// @param vga_mode the current VGA mode.
+static void __read_registers(vga_mode_t *vga_mode) {
+  unsigned char *ptr = &vga_mode->misc;
 
   // read MISCELLANEOUS
   *ptr = inportb(MISC_READ);
@@ -484,31 +476,31 @@ static inline unsigned __read_pixel_8(int x, int y) {
 // = VGA PUBLIC FUNCTIONS
 // ============================================================================
 
-int fb_is_enabled() {
-  return fb_enable;
+int vga_is_enabled() {
+  return vga_enable;
 }
 
-int fb_width() {
-  if (fb_enable)
+int vga_width() {
+  if (vga_enable)
     return driver->width;
   return 0;
 }
 
-int fb_height() {
-  if (fb_enable)
+int vga_height() {
+  if (vga_enable)
     return driver->height;
   return 0;
 }
 
-void fb_draw_pixel(int x, int y, unsigned char color) {
+void vga_draw_pixel(int x, int y, unsigned char color) {
   driver->ops->write_pixel(x, y, color);
 }
 
-unsigned int fb_read_pixel(int x, int y) {
+unsigned int vga_read_pixel(int x, int y) {
   return driver->ops->read_pixel(x, y);
 }
 
-void fb_draw_char(int x, int y, unsigned char c, unsigned char color) {
+void vga_draw_char(int x, int y, unsigned char c, unsigned char color) {
   static unsigned mask[] = {
     1u << 0u, //            1
     1u << 1u, //            2
@@ -523,27 +515,27 @@ void fb_draw_char(int x, int y, unsigned char c, unsigned char color) {
   const unsigned char *glyph = driver->font->font + c * driver->font->height;
   for (unsigned cy = 0; cy < driver->font->height; ++cy) {
     for (unsigned cx = 0; cx < driver->font->width; ++cx) {
-      fb_draw_pixel(x + (driver->font->width - cx), y + cy,
-                    glyph[cy] & mask[cx] ? color : 0x00u);
+      vga_draw_pixel(x + (driver->font->width - cx), y + cy,
+                     glyph[cy] & mask[cx] ? color : 0x00u);
     }
   }
 }
 
-void fb_draw_string(int x, int y, const char *str, unsigned char color) {
+void vga_draw_string(int x, int y, const char *str, unsigned char color) {
   char i = 0;
   while (*str != '\0') {
-    fb_draw_char(x + i * 8, y, *str, color);
+    vga_draw_char(x + i * 8, y, *str, color);
     str++;
     i++;
   }
 }
 
-void fb_draw_line(int x0, int y0, int x1, int y1, unsigned char color) {
+void vga_draw_line(int x0, int y0, int x1, int y1, unsigned char color) {
   int dx = abs(x1 - x0), sx = sign(x1 - x0);
   int dy = abs(y1 - y0), sy = sign(y1 - y0);
   int err = (dx > dy ? dx : -dy) / 2;
   while (true) {
-    fb_draw_pixel(x0, y0, color);
+    vga_draw_pixel(x0, y0, color);
     if ((x0 == x1) && (y0 == y1))
       break;
     if (dx > dy) {
@@ -562,14 +554,14 @@ void fb_draw_line(int x0, int y0, int x1, int y1, unsigned char color) {
   }
 }
 
-void fb_draw_rectangle(int sx, int sy, int w, int h, unsigned char color) {
-  fb_draw_line(sx, sy, sx + w, sy, color);
-  fb_draw_line(sx, sy, sx, sy + h, color);
-  fb_draw_line(sx, sy + h, sx + w, sy + h, color);
-  fb_draw_line(sx + w, sy, sx + w, sy + h, color);
+void vga_draw_rectangle(int sx, int sy, int w, int h, unsigned char color) {
+  vga_draw_line(sx, sy, sx + w, sy, color);
+  vga_draw_line(sx, sy, sx, sy + h, color);
+  vga_draw_line(sx, sy + h, sx + w, sy + h, color);
+  vga_draw_line(sx + w, sy, sx + w, sy + h, color);
 }
 
-void fb_draw_circle(int xc, int yc, int r, unsigned char color) {
+void vga_draw_circle(int xc, int yc, int r, unsigned char color) {
   int x = 0;
   int y = r;
   int p = 3 - 2 * r;
@@ -577,14 +569,14 @@ void fb_draw_circle(int xc, int yc, int r, unsigned char color) {
     return;
   while (y >= x) // only formulate 1/8 of circle
   {
-    fb_draw_pixel(xc - x, yc - y, color); //upper left left
-    fb_draw_pixel(xc - y, yc - x, color); //upper upper left
-    fb_draw_pixel(xc + y, yc - x, color); //upper upper right
-    fb_draw_pixel(xc + x, yc - y, color); //upper right right
-    fb_draw_pixel(xc - x, yc + y, color); //lower left left
-    fb_draw_pixel(xc - y, yc + x, color); //lower lower left
-    fb_draw_pixel(xc + y, yc + x, color); //lower lower right
-    fb_draw_pixel(xc + x, yc + y, color); //lower right right
+    vga_draw_pixel(xc - x, yc - y, color); //upper left left
+    vga_draw_pixel(xc - y, yc - x, color); //upper upper left
+    vga_draw_pixel(xc + y, yc - x, color); //upper upper right
+    vga_draw_pixel(xc + x, yc - y, color); //upper right right
+    vga_draw_pixel(xc - x, yc + y, color); //lower left left
+    vga_draw_pixel(xc - y, yc + x, color); //lower lower left
+    vga_draw_pixel(xc + y, yc + x, color); //lower lower right
+    vga_draw_pixel(xc + x, yc + y, color); //lower right right
     if (p < 0)
       p += 4 * x++ + 6;
     else
@@ -592,88 +584,37 @@ void fb_draw_circle(int xc, int yc, int r, unsigned char color) {
   }
 }
 
-void fb_draw_triangle(int x1, int y1, int x2, int y2, int x3, int y3,
-                      unsigned char color) {
-  fb_draw_line(x1, y1, x2, y2, color);
-  fb_draw_line(x2, y2, x3, y3, color);
-  fb_draw_line(x3, y3, x1, y1, color);
-}
-
-void fb_run_test(void) {
-  fb_clear();
-  //pr_warning("%d\n", fb_read_pixel(10, 10));
-  //fb_draw_pixel(10, 10, 2);
-  //pr_warning("%d\n", fb_read_pixel(10, 10));
-  //fb_draw_pixel(10, 10, 3);
-  //pr_warning("%d\n", fb_read_pixel(10, 10));
-  //fb_draw_pixel(10, 10, 4);
-  //pr_warning("%d\n", fb_read_pixel(10, 10));
-  //fb_draw_pixel(10, 10, 5);
-  //pr_warning("%d\n", fb_read_pixel(10, 10));
-  //for (unsigned r = 0; r <= min(fb_width() / 2, vga_height() / 2); r += 4)
-  //    fb_draw_circle(vga_width() / 2, vga_height() / 2, r, 2);
-  //for (unsigned y = 0; y < fb_height(); y += 2)
-  //    fb_draw_line(0, y, vga_width(), y, 3);
-  //for (unsigned dim = 0; dim < min(fb_width(), vga_height()); dim += 4)
-  //    fb_draw_rectangle((vga_width() / 2) - (dim / 2), (vga_height() / 2) - (dim / 2), dim, dim, 4);
-  //fb_draw_triangle(0,  50, 50, 0, 100, 50, 2);
-  //fb_draw_string(driver->font->width, driver->font->height * 2, "Hello World!", 1);
+void vga_draw_triangle(int x1, int y1, int x2, int y2, int x3, int y3,
+                       unsigned char color) {
+  vga_draw_line(x1, y1, x2, y2, color);
+  vga_draw_line(x2, y2, x3, y3, color);
+  vga_draw_line(x3, y3, x1, y1, color);
 }
 
 // == MODEs and DRIVERs =======================================================
 
-static fb_ops_t ops_720_480_16 = {
+static vga_ops_t ops_720_480_16 = {
   .write_pixel = __write_pixel_4,
   .read_pixel = __read_pixel_4,
   .draw_rect = NULL,
   .fill_rect = NULL,
 };
 
-static fb_ops_t ops_640_480_16 = {
+static vga_ops_t ops_640_480_16 = {
   .write_pixel = __write_pixel_4,
   .read_pixel = __read_pixel_4,
   .draw_rect = NULL,
   .fill_rect = NULL,
 };
 
-static fb_ops_t ops_320_200_256 = {
+static vga_ops_t ops_320_200_256 = {
   .write_pixel = __write_pixel_8,
   .read_pixel = __read_pixel_8,
   .draw_rect = NULL,
   .fill_rect = NULL,
 };
 
-static fb_font_t font_4x6 = {
-  .font = arr_4x6_font,
-  .width = 4,
-  .height = 6,
-};
-
-static fb_font_t font_5x6 = {
-  .font = arr_5x6_font,
-  .width = 5,
-  .height = 6,
-};
-
-static fb_font_t font_8x8 = {
-  .font = arr_8x8_font,
-  .width = 8,
-  .height = 8,
-};
-
-static fb_font_t font_8x14 = {
-  .font = arr_8x14_font,
-  .width = 8,
-  .height = 14,
-};
-
-static fb_font_t font_8x16 = {
-  .font = arr_8x16_font,
-  .width = 8,
-  .height = 16,
-};
-
-static fb_driver_t driver_720_480_16 = {
+static vga_driver_t driver_720_480_16 = {
   .width = 720,
   .height = 480,
   .bpp = 16,
@@ -681,7 +622,7 @@ static fb_driver_t driver_720_480_16 = {
   .ops = &ops_720_480_16,
 };
 
-static fb_driver_t driver_640_480_16 = {
+static vga_driver_t driver_640_480_16 = {
   .width = 640,
   .height = 480,
   .bpp = 16,
@@ -689,7 +630,7 @@ static fb_driver_t driver_640_480_16 = {
   .ops = &ops_640_480_16,
 };
 
-static fb_driver_t driver_320_200_256 = {
+static vga_driver_t driver_320_200_256 = {
   .width = 320,
   .height = 200,
   .bpp = 256,
@@ -699,74 +640,13 @@ static fb_driver_t driver_320_200_256 = {
 
 // == INITIALIZE and FINALIZE =================================================
 
-void fb_init(boot_info_t *boot_info) {
+void vga_init(boot_info_t *boot_info) {
   // Save the current palette.
   __save_palette(stored_palette, 256);
 
   // Initialize the desired mode.
 
-  struct multiboot_tag_framebuffer *mfb =
-    boot_info->multiboot_header->multiboot_framebuffer;
-
-  // framebuffer un-supported
-  if (!mfb) {
-    // EGA 80x25 text mode
-    return;
-  }
-
-  uint32_t width = mfb->common.framebuffer_width;
-  uint32_t height = mfb->common.framebuffer_height;
-  uint32_t bpp = mfb->common.framebuffer_bpp;
-
-  IS_MODE(320, 200, 256) { // 40x25
-    // Initialize the mode.
-    driver = &driver_320_200_256;
-    // Load the color palette.
-    __load_palette(ansi_256_palette, 256);
-    // Set the font.
-    driver->font = &font_5x6;
-  }
-  else IS_MODE(640, 480, 16) { // 80x60
-    // Initialize the mode.
-    driver = &driver_640_480_16;
-    // Load the color palette.
-    __load_palette(ansi_16_palette, 16);
-    // Set the font.
-    driver->font = &font_8x14;
-  }
-  else IS_MODE(720, 480, 16) { // 90x60
-    // Initialize the mode.
-    driver = &driver_720_480_16;
-    // Load the color palette.
-    __load_palette(ansi_16_palette, 16);
-    // Set the font.
-    driver->font = &font_8x16;
-  }
-  else {
-    // default
-    driver = &driver_720_480_16;
-    // Load the color palette.
-    __load_palette(ansi_16_palette, 16);
-    // Set the font.
-    driver->font = &font_8x16;
-  }
-  // Set the address.
-  driver->address = (char *)boot_info->fb_start;
-  // Save the content of the memory.
-  memcpy(vidmem, driver->address, 0x4000);
-  // Clears the screen.
-  fb_clear();
-  // Set the vga as enabled.
-  fb_enable = true;
-}
-
-void fb_init_mentos() {
-  // Save the current palette.
-  __save_palette(stored_palette, 256);
-
-  // Initialize the desired mode.
-
-#if defined(fb_MODE_320_200_256) // 40x25
+#if defined(vga_MODE_320_200_256) // 40x25
   // Write the registers.
   __set_mode(&_mode_320_200_256);
   // Initialize the mode.
@@ -775,7 +655,7 @@ void fb_init_mentos() {
   __load_palette(ansi_256_palette, 256);
   // Set the font.
   driver->font = &font_5x6;
-#elif defined(fb_MODE_640_480_16) // 80x60
+#elif defined(vga_MODE_640_480_16) // 80x60
   // Write the registers.
   __set_mode(&_mode_640_480_16);
   // Initialize the mode.
@@ -784,7 +664,7 @@ void fb_init_mentos() {
   __load_palette(ansi_16_palette, 16);
   // Set the font.
   driver->font = &font_8x14;
-#elif defined(fb_MODE_720_480_16) // 90x60
+#elif defined(vga_MODE_720_480_16) // 90x60
   // Write the registers.
   __set_mode(&_mode_720_480_16);
   // Initialize the mode.
@@ -793,7 +673,7 @@ void fb_init_mentos() {
   __load_palette(ansi_16_palette, 16);
   // Set the font.
   driver->font = &font_8x16;
-#else // fb_TEXT_MODE
+#else // vga_TEXT_MODE
   return;
 #endif
   // Set the address.
@@ -801,16 +681,16 @@ void fb_init_mentos() {
   // Save the content of the memory.
   memcpy(vidmem, driver->address, 0x4000);
   // Clears the screen.
-  fb_clear();
+  vga_clear();
   // Set the vga as enabled.
-  fb_enable = true;
+  vga_enable = true;
 }
 
-void fb_finalize() {
+void vga_finalize() {
   memcpy(driver->address, vidmem, 256 * 1024);
   __set_mode(&_mode_80_25_text);
   __load_palette(stored_palette, 256);
-  fb_enable = false;
+  vga_enable = false;
 }
 
 static int _x = 0;
@@ -818,61 +698,61 @@ static int _y = 0;
 static unsigned char _color = 7;
 static int _cursor_state = 0;
 
-inline static void __fb_clear_cursor() {
+inline static void __vga_clear_cursor() {
   for (unsigned cy = 0; cy < driver->font->height; ++cy)
     for (unsigned cx = 0; cx < driver->font->width; ++cx)
-      fb_draw_pixel(_x + cx, _y + cy, 0);
+      vga_draw_pixel(_x + cx, _y + cy, 0);
 }
 
-inline static void __fb_draw_cursor() {
+inline static void __vga_draw_cursor() {
   unsigned char color = (_cursor_state = (_cursor_state == 0)) * _color;
   for (unsigned cy = 0; cy < driver->font->height; ++cy)
     for (unsigned cx = 0; cx < driver->font->width; ++cx)
-      fb_draw_pixel(_x + cx, _y + cy, color);
+      vga_draw_pixel(_x + cx, _y + cy, color);
 }
 
-void fb_putc(int c) {
+void vga_putc(int c) {
   if (_cursor_state)
-    __fb_clear_cursor();
+    __vga_clear_cursor();
   // If the character is '\n' go the new line.
   if (c == '\n') {
-    fb_new_line();
+    vga_new_line();
   } else if ((c >= 0x20) && (c <= 0x7E)) {
-    fb_draw_char(_x, _y, c, _color);
+    vga_draw_char(_x, _y, c, _color);
     if ((_x += driver->font->width) >= driver->width)
-      fb_new_line();
+      vga_new_line();
   } else {
     return;
   }
 }
 
-void fb_puts(const char *str) {
+void vga_puts(const char *str) {
   while ((*str) != 0) {
-    fb_putc((*str++));
+    vga_putc((*str++));
   }
 }
 
-void fb_move_cursor(unsigned int x, unsigned int y) {
+void vga_move_cursor(unsigned int x, unsigned int y) {
   _x = x * driver->font->width;
   _y = y * driver->font->height;
-  __fb_draw_cursor();
+  __vga_draw_cursor();
 }
 
-void fb_get_cursor_position(unsigned int *x, unsigned int *y) {
+void vga_get_cursor_position(unsigned int *x, unsigned int *y) {
   if (x)
     *x = _x / driver->font->width;
   if (y)
     *y = _y / driver->font->height;
 }
 
-void fb_get_screen_size(unsigned int *width, unsigned int *height) {
+void vga_get_screen_size(unsigned int *width, unsigned int *height) {
   if (width)
     *width = driver->width / driver->font->width;
   if (height)
     *height = driver->height / driver->font->height;
 }
 
-void fb_clear() {
+void vga_clear() {
   unsigned original_plane = __get_plane();
   for (unsigned plane = 0; plane < 4; ++plane) {
     __set_plane(plane);
@@ -882,7 +762,7 @@ void fb_clear() {
   _x = 0, _y = 0;
 }
 
-void fb_new_line() {
+void vga_new_line() {
   // Just the 5x6 font needs some space.
   const unsigned int vertical_space = (driver->font == &font_5x6);
   // Go back at the beginning of the line.
@@ -890,16 +770,16 @@ void fb_new_line() {
   if ((_y += driver->font->height + vertical_space) >=
       (driver->height - driver->font->height)) {
     _y = 0;
-    fb_clear();
+    vga_clear();
   }
 }
 
-void fb_update() {
+void vga_update() {
   // if ((timer_get_ticks() % (TICKS_PER_SECOND / 2)) == 0) {
-  //   __fb_draw_cursor();
+  //   __vga_draw_cursor();
   // }
 }
 
-void fb_set_color(unsigned int color) {
+void vga_set_color(unsigned int color) {
   _color = color;
 }

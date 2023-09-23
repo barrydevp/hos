@@ -781,7 +781,7 @@ static const unsigned char arr_8x8_font[] = {
 };
 
 /// @brief Font 5x6
-const unsigned char arr_5x6_font[] = {
+static const unsigned char arr_5x6_font[] = {
     0x00, 0x15, 0x00, 0x11, 0x00, 0x15, //   0 : ' '
     0x00, 0x04, 0x0E, 0x1F, 0x0E, 0x04, //   1 : ' '
     0x15, 0x0A, 0x15, 0x0A, 0x15, 0x0A, //   2 : ' '
@@ -1041,7 +1041,7 @@ const unsigned char arr_5x6_font[] = {
 };
 
 /// @brief Font 4x6
-const unsigned char arr_4x6_font[] = {
+static const unsigned char arr_4x6_font[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //   0 : ' '
     0x02, 0x05, 0x07, 0x05, 0x02, 0x00, //   1 : ' '
     0x02, 0x07, 0x05, 0x07, 0x02, 0x00, //   2 : ' '
@@ -1299,3 +1299,42 @@ const unsigned char arr_4x6_font[] = {
     0x00, 0x00, 0x06, 0x06, 0x00, 0x00, // 254 : ' '
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 255
 };
+
+/// VGA font details.
+typedef struct {
+  const unsigned char
+    *font; ///< Pointer to the array holding the shape of each character.
+  unsigned width; ///< Width of the font.
+  unsigned height; ///< Height of the font.
+} video_font_t;
+
+static video_font_t font_4x6 = {
+  .font = arr_4x6_font,
+  .width = 4,
+  .height = 6,
+};
+
+static video_font_t font_5x6 = {
+  .font = arr_5x6_font,
+  .width = 5,
+  .height = 6,
+};
+
+static video_font_t font_8x8 = {
+  .font = arr_8x8_font,
+  .width = 8,
+  .height = 8,
+};
+
+static video_font_t font_8x14 = {
+  .font = arr_8x14_font,
+  .width = 8,
+  .height = 14,
+};
+
+static video_font_t font_8x16 = {
+  .font = arr_8x16_font,
+  .width = 8,
+  .height = 16,
+};
+

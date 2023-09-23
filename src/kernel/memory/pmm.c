@@ -368,8 +368,8 @@ void pmm_init(struct boot_info_t *boot_info) {
   pmm_deinit_region(boot_info->kernel_phy_start, boot_info->kernel_phy_end);
   /* Now mark everything up to addressable_phy as in use */
   pmm_deinit_region(boot_info->kernel_phy_end, addressable_phy);
-  // framebuffer region
-  pmm_deinit_region(boot_info->fb_phy_start, boot_info->fb_phy_end);
+  // video region
+  pmm_deinit_region(boot_info->video_phy_start, boot_info->video_phy_end);
 
   /* Count available and used frames */
   for (uint32_t i = 0; i < FRAME_INDEX(max_frames); ++i) {

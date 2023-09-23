@@ -108,7 +108,9 @@ all-c: qemu-c-kernel
 
 all-cd: qemu-c-kernel-debug
 
-PHONY += qemu-kernel qemu-c-kernel qemu-c-kernel-debug
+all-cgui: qemu-c-kernel-gui
+
+PHONY += qemu-kernel qemu-c-kernel qemu-c-kernel-debug + qemu-c-kernel-gui
 
 qemu-kernel: hos.kernel
 	$(EMU) $(EMU_FLAGS) -nographic -curses -kernel $^
@@ -123,6 +125,9 @@ qemu-c-kernel: hos.iso
 qemu-c-kernel-debug: hos.iso
 	# $(EMU) $(EMU_FLAGS) -nographic -curses -s -S -serial file:c.kernel.log -kernel $^
 	$(EMU) $(EMU_FLAGS) -nographic -curses -s -S -serial file:c.kernel.log -cdrom $^
+
+qemu-c-kernel-gui: hos.iso
+	$(EMU) $(EMU_FLAGS) -serial file:c.kernel.log -cdrom $^
 
 PHONY += hos.bin
 

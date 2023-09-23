@@ -1,4 +1,4 @@
-#include <kernel/drivers/vga/ega.h>
+#include <kernel/drivers/video/ega.h>
 #include <arch/i386/ports.h>
 #include <arch/i386/cpu.h>
 #include <kernel/ctype.h>
@@ -164,7 +164,7 @@ static inline void __ega_set_cursor(unsigned int x, unsigned int y) {
 }
 
 void ega_init(boot_info_t *boot_info) {
-  video_base = (char *)boot_info->fb_start;
+  video_base = (char *)boot_info->video_start;
   // pointer = pointer - ADDR + video_base;
   pointer = video_base;
   ega_clear();

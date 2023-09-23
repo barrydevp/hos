@@ -3,7 +3,7 @@
 #include <kernel/ctype.h>
 #include <kernel/string.h>
 #include <kernel/fcvt.h>
-#include <kernel/drivers/vga.h>
+#include <kernel/drivers/video.h>
 
 /// Size of the buffer used to call cvt functions.
 #define CVTBUFSIZE 500
@@ -649,7 +649,7 @@ int printf(const char *format, ...) {
   va_start(ap, format);
   len = vsprintf(buffer, format, ap);
   va_end(ap);
-  vga_puts(buffer);
+  video_puts(buffer);
   return len;
 }
 
@@ -661,7 +661,7 @@ int dprintf(const char *format, ...) {
   va_start(ap, format);
   len = vsprintf(buffer, format, ap);
   va_end(ap);
-  vga_puts(buffer);
+  video_puts(buffer);
   return len;
 }
 

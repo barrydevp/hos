@@ -37,24 +37,24 @@ mb2_tag_entry:
 .long _start
 
 /* Flags tag */
-#.align 8
-#.word 4
-#.word 1
-#.long 12
-#.long 2 /* We support EGA text, but don't require it */
+.align 8
+.word 4
+.word 1
+.long 12
+.long 2 /* We support EGA text, but don't require it */
 
 /* Framebuffer tag */
-#.align 8
-#mb2_tag_fb:
-#.word 5
-##.word 0
-#.word 1
-#.long 20
-##.long 1024
-##.long 768
-#.long 800
-#.long 600
-#.long 32
+.align 8
+mb2_tag_fb:
+.word 5
+#.word 0
+.word 1
+.long 20
+#.long 1024
+#.long 768
+.long 640
+.long 480
+.long 16
 
 /* Modules alignment tag */
 .align 8

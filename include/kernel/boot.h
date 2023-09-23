@@ -76,16 +76,16 @@ typedef struct boot_info_t {
   /// highmem addressable end
   uint32_t highmem_phy_end;
 
-  /// framebuffer phy address start
-  uint32_t fb_phy_start;
-  /// framebuffer phy address end
-  uint32_t fb_phy_end;
-  /// framebuffer address start
-  uint32_t fb_start;
-  /// framebuffer address end
-  uint32_t fb_end;
-  /// framebuffer multiboot type
-  uint8_t fb_type;
+  /// video phy address start
+  uint32_t video_phy_start;
+  /// video phy address end
+  uint32_t video_phy_end;
+  /// video address start
+  uint32_t video_start;
+  /// video address end
+  uint32_t video_end;
+  /// video multiboot type
+  uint8_t video_type;
 
   /// multiboot info
   struct multiboot_info *multiboot_header;

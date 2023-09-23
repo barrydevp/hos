@@ -496,12 +496,10 @@ void vmm_init(struct boot_info_t *boot_info) {
     vmm_create_page(pmm_start + i_virt, PML_KERNEL_ACCESS);
   }
 
-  /* Map page for framebuffer region */
-  uint32_t fb_size = (boot_info->fb_end - boot_info->fb_start);
-  for (uint32_t i_virt = 0; i_virt < fb_size; i_virt += PAGE_SIZE) {
-    dprintf("fb_a: 0x%p, 0x%p\n", boot_info->fb_start + i_virt,
-            boot_info->fb_phy_start + i_virt);
-    vmm_map_page(boot_info->fb_start + i_virt, boot_info->fb_phy_start + i_virt,
+  /* Map page for video region */
+  uint32_t video_size = (boot_info->video_end - boot_info->video_start);
+  for (uint32_t i_virt = 0; i_virt < video_size; i_virt += PAGE_SIZE) {
+    vmm_map_page(boot_info->video_start + i_virt, boot_info->video_phy_start + i_virt,
                  PML_USER_ACCESS);
   }
 

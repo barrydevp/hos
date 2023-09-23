@@ -1,5 +1,5 @@
 #include <kernel/printf.h>
-#include <kernel/drivers/vga.h>
+#include <kernel/drivers/video.h>
 
 // int printf(const char *fmt, ...) {
 //   va_list args;
