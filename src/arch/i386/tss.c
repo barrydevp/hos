@@ -10,7 +10,7 @@
 
 static tss_entry_t kernel_tss;
 
-void tss_init(uint8_t idx, uint32_t ss0) {
+void tss_init(uint8_t gdt_idx, uint32_t ss0) {
   uint32_t base = (uint32_t)&kernel_tss;
   uint32_t limit = base + sizeof(tss_entry_t);
 
@@ -23,7 +23,7 @@ void tss_init(uint8_t idx, uint32_t ss0) {
   //    0   can not be executed by ring lower or equal to DPL,
   //    0   not readable
   //    1   access bit, always 0, cpu set this to 1 when accessing this sector
-  gdt_set_descriptor(idx, base, limit,
+  gdt_set_descriptor(gdt_idx, base, limit,
                      I86_GDT_DESC_ACCESS | I86_GDT_DESC_EXEC_CODE |
                        I86_GDT_DESC_DPL | I86_GDT_DESC_MEMORY,
                      0x0);

@@ -14,18 +14,6 @@
 #define IS_MODE(_width, _height, _colors) \
   if (width == _width && height == _height && colors == _colors)
 
-/// Framebuffer pointers for drawing operations.
-typedef struct {
-  /// Writes a pixel.
-  void (*write_pixel)(int x, int y, unsigned char c);
-  /// Reads a pixel.
-  unsigned (*read_pixel)(int x, int y);
-  /// Draws a rectangle.
-  void (*draw_rect)(int x, int y, int wd, int ht, unsigned char c);
-  /// Fills a rectangle.
-  void (*fill_rect)(int x, int y, int wd, int ht, unsigned char c);
-} fb_ops_t;
-
 /// Framebuffer driver details.
 typedef struct {
   uint32_t width; ///< Screen's width.
@@ -33,7 +21,6 @@ typedef struct {
   uint8_t bpp; ///< Bits per pixel (bpp).
   uint32_t pitch; ///< Bits per pixel (bpp).
   uint8_t *address; ///< Starting address of the screen.
-  // fb_ops_t *ops; ///< Writing operations.
   video_font_t *font; ///< The current font.
 
   // state
@@ -95,7 +82,7 @@ int fb_height() {
   return 0;
 }
 
-void fb_draw_pixel(int x, int y, uint32_t color) {
+static inline void __draw_pixel(int x, int y, uint32_t color) {
   switch (driver->bpp) {
     case 8: {
       uint8_t *pixel = driver->address + driver->pitch * y + x;
@@ -117,6 +104,10 @@ void fb_draw_pixel(int x, int y, uint32_t color) {
   }
 }
 
+void fb_draw_pixel(int x, int y, uint32_t color) {
+  __draw_pixel(x, y, color);
+}
+
 /// TODO: move to font writer
 void fb_draw_char(int x, int y, unsigned char c, uint32_t fg, uint32_t bg) {
   static unsigned mask[] = {
@@ -133,8 +124,8 @@ void fb_draw_char(int x, int y, unsigned char c, uint32_t fg, uint32_t bg) {
   const unsigned char *glyph = driver->font->font + c * driver->font->height;
   for (unsigned iy = 0; iy < driver->font->height; ++iy) {
     for (unsigned ix = 0; ix < driver->font->width; ++ix) {
-      fb_draw_pixel(x + (driver->font->width - ix), y + iy,
-                    glyph[iy] & mask[ix] ? fg : bg);
+      __draw_pixel(x + (driver->font->width - ix), y + iy,
+                   glyph[iy] & mask[ix] ? fg : bg);
     }
   }
 }
@@ -301,74 +292,6 @@ void fb_init(boot_info_t *boot_info) {
   if (!mfb) {
     // EGA 80x25 text mode
     return;
-  }
-
-  multiboot_uint32_t color;
-  unsigned i;
-  void *fb = (void *)boot_info->video_start;
-
-  // printf(" type=%u\n", mfb->common.framebuffer_type);
-  switch (mfb->common.framebuffer_type) {
-    case MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED: {
-      unsigned best_distance, distance;
-      struct multiboot_color *palette;
-
-      palette = mfb->framebuffer_palette;
-
-      color = 0;
-      best_distance = 4 * 256 * 256;
-
-      for (i = 0; i < mfb->framebuffer_palette_num_colors; i++) {
-        distance = (0xff - palette[i].blue) * (0xff - palette[i].blue) +
-                   palette[i].red * palette[i].red +
-                   palette[i].green * palette[i].green;
-        if (distance < best_distance) {
-          color = i;
-          best_distance = distance;
-        }
-      }
-    } break;
-
-    case MULTIBOOT_FRAMEBUFFER_TYPE_RGB:
-      color = ((1 << mfb->framebuffer_blue_mask_size) - 1)
-              << mfb->framebuffer_blue_field_position;
-      break;
-
-    case MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT:
-      color = '\\' | 0x0100;
-      break;
-
-    default:
-      color = 0xffffffff;
-      break;
-  }
-
-  for (i = 0;
-       i < mfb->common.framebuffer_width && i < mfb->common.framebuffer_height;
-       i++) {
-    switch (mfb->common.framebuffer_bpp) {
-      case 8: {
-        multiboot_uint8_t *pixel = fb + mfb->common.framebuffer_pitch * i + i;
-        *pixel = color;
-      } break;
-      case 15:
-      case 16: {
-        multiboot_uint16_t *pixel =
-          fb + mfb->common.framebuffer_pitch * i + 2 * i;
-        *pixel = color;
-      } break;
-      case 24: {
-        multiboot_uint32_t *pixel =
-          fb + mfb->common.framebuffer_pitch * i + 3 * i;
-        *pixel = (color & 0xffffff) | (*pixel & 0xff000000);
-      } break;
-
-      case 32: {
-        multiboot_uint32_t *pixel =
-          fb + mfb->common.framebuffer_pitch * i + 4 * i;
-        *pixel = color;
-      } break;
-    }
   }
 
   driver = &driver0;

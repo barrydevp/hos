@@ -653,18 +653,6 @@ int printf(const char *format, ...) {
   return len;
 }
 
-int dprintf(const char *format, ...) {
-  char buffer[4096];
-  va_list ap;
-  int len;
-  // Start variabile argument's list.
-  va_start(ap, format);
-  len = vsprintf(buffer, format, ap);
-  va_end(ap);
-  video_puts(buffer);
-  return len;
-}
-
 int sprintf(char *str, const char *fmt, ...) {
   va_list args;
   int len;

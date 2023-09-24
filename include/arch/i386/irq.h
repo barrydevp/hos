@@ -32,11 +32,11 @@ struct __attribute__((packed)) idtr {
 #define IRQ_CONTINUE 0
 #define IRQ_STOP 1
 
-typedef void (*I86_IVT)(pt_regs *regs);
-typedef int32_t (*I86_IRQ_HANDLER)(pt_regs *registers);
+typedef void (*interrupt_handler_t)(pt_regs *regs);
+typedef int32_t (*irq_handler_t)(pt_regs *regs);
 
 void idt_init();
-void isr_install_handler(uint32_t index, I86_IRQ_HANDLER handler);
+void irq_install_handler(uint32_t index, irq_handler_t handler);
 
 /* ISRs reserved for CPU exceptions */
 extern void isr0();

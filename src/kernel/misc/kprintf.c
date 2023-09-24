@@ -1,22 +1,21 @@
 #include <kernel/printf.h>
+#include <arch/i386/serial.h>
 #include <kernel/drivers/video.h>
 
-// int printf(const char *fmt, ...) {
-//   va_list args;
-//   va_start(args, fmt);
-//   vga_puts((char *)fmt);
-//   // int out = xvasprintf(cb_printf, NULL, fmt, args);
-//   va_end(args);
-//   // return out;
-//   return 0;
-// }
+int dprintf(const char *format, ...) {
+  char buffer[4096];
+  va_list ap;
+  int len;
+  // Start variabile argument's list.
+  va_start(ap, format);
+  len = vsprintf(buffer, format, ap);
+  va_end(ap);
 
-// int dprintf(const char *fmt, ...) {
-//   va_list args;
-//   va_start(args, fmt);
-//   vga_puts((char *)fmt);
-//   // int out = xvasprintf(cb_printf, NULL, fmt, args);
-//   va_end(args);
-//   // return out;
-//   return 0;
-// }
+  const char *s = buffer;
+  while ((*s) != 0)
+    serial_output(SERIAL_PORT_A, *s++);
+
+  // video_puts(buffer);
+
+  return len;
+}

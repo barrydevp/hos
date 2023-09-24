@@ -477,6 +477,8 @@ void vmm_init(struct boot_info_t *boot_info) {
   uintptr_t k_phy_pdir = __get_cr3();
 
   /** unmap the identity mapping first 4MB */
+  // TODO: currently we cannot unmap this because multiboot
+  // data is mapped at it's space
   // k_pdir->entries[0].raw = 0;
 
   /* Preallocate ptable for higher half kernel and set KERNEL ACCESS protected */
@@ -504,10 +506,10 @@ void vmm_init(struct boot_info_t *boot_info) {
   }
 
   /* Allocate page for kernel heap region */
-  uint32_t heap_size = (boot_info->heap_end - boot_info->heap_start);
-  for (uint32_t i_virt = 0; i_virt < heap_size; i_virt += PAGE_SIZE) {
-    vmm_create_page(boot_info->heap_start + i_virt, PML_USER_ACCESS);
-  }
+  // uint32_t heap_size = (boot_info->heap_end - boot_info->heap_start);
+  // for (uint32_t i_virt = 0; i_virt < heap_size; i_virt += PAGE_SIZE) {
+  //   vmm_create_page(boot_info->heap_start + i_virt, PML_USER_ACCESS);
+  // }
 
   vmm_set_directory(k_pdir, k_phy_pdir);
   // vmm_paging(va_dir, pa_dir);

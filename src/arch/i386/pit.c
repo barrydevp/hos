@@ -40,7 +40,7 @@ static int32_t pit_interrupt(pt_regs *r) {
  */
 void pit_init(void) {
   /* register ISR for PIT IRQ */
-  isr_install_handler(TIMER_IRQ, pit_interrupt);
+  irq_install_handler(TIMER_IRQ, pit_interrupt);
 
   /* Enable PIT */
   pit_set_timer_phase(100);

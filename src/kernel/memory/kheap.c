@@ -193,24 +193,36 @@ static void *__do_brk(uint32_t *heap_top, vm_area_struct_t *heap,
                       int increment) {
   assert(heap_top && "Pointer to the current top of the heap is NULL.");
   assert(heap && "Pointer to the heap is NULL.");
-  //    pr_default("BRK> %s: heap_start: %p, free space: %d\n",
-  //              (heap == &kernel_heap)? "KERNEL" : "USER",
-  //              heap->vm_start, heap_end - heap_curr);
+  dprintf("BRK> %s: heap_start: %p, free space: %d\n",
+          (heap == &kernel_heap) ? "KERNEL" : "USER",
+          (uint32_t *)heap->vm_start, heap->vm_end - (uint32_t)heap_top);
   if (increment > 0) {
     // Compute the new boundary.
-    uint32_t new_boundary = *heap_top + increment;
+    uint32_t size = (uint32_t)increment;
+    uint32_t new_boundary = *heap_top + size;
     // If new boundary is smaller or equal to end, simply
     // update the heap_top to the new boundary and return
     // the old heap_top.
+
     if (new_boundary <= heap->vm_end) {
       // Save the old top of the heap.
       uint32_t old_heap_top = *heap_top;
       // Overwrite the top of the heap.
       *heap_top = new_boundary;
       // Return the old top of the heap.
+
+      for (uint32_t i_virt = 0; i_virt < size; i_virt += PAGE_SIZE) {
+        vmm_create_page((uint32_t)heap_top + i_virt, PML_USER_ACCESS);
+      }
+
       return (void *)old_heap_top;
+    } else {
+      dprintf("Out of heap memory.\n");
+      goto ret_null;
     }
   }
+
+ret_null:
   return NULL;
 }
 
@@ -818,9 +830,9 @@ void kheap_dump() {
   block_t *it = head_block;
   while (it) {
     dprintf("[%c] %12u (%12u)   from 0x%p to 0x%p\n",
-             (block_is_free(it)) ? 'F' : 'A', block_get_real_size(it->size),
-             it->size, it,
-             (char *)it + OVERHEAD + block_get_real_size(it->size));
+            (block_is_free(it)) ? 'F' : 'A', block_get_real_size(it->size),
+            it->size, it,
+            (char *)it + OVERHEAD + block_get_real_size(it->size));
     total += block_get_real_size(it->size);
     total_overhead += OVERHEAD;
     it = it->next;
@@ -856,7 +868,11 @@ void kheap_init(boot_info_t *boot_info) {
   // static block_t *tail = NULL;
   // 3) All the memory blocks that are freed.
   // static block_t *freelist = NULL;
-  memset((void *)kernel_heap_top, 0, 3 * sizeof(block_t *));
-  kernel_heap_top += 3 * sizeof(block_t *);
+  uint32_t allocated = 3 * sizeof(block_t *);
+  // allocate page and map
+  for (uint32_t i_virt = 0; i_virt < allocated; i_virt += PAGE_SIZE) {
+    vmm_create_page((uint32_t)kernel_heap_top + i_virt, PML_USER_ACCESS);
+  }
+  memset((void *)kernel_heap_top, 0, allocated);
+  kernel_heap_top += allocated;
 }
-

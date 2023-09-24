@@ -3,7 +3,9 @@
 #include <arch/i386/irq.h>
 #include <arch/i386/pic.h>
 #include <arch/i386/pit.h>
+#include <arch/i386/rtc.h>
 #include <arch/i386/cpu.h>
+#include <arch/i386/serial.h>
 
 #include <kernel/kernel.h>
 #include <kernel/boot.h>
@@ -18,10 +20,11 @@
 /// @brief Boot info provided to the kmain function.
 static struct boot_info_t boot_info;
 
-int kenter(uint32_t magic, uint32_t addr) {
-  // video early init for logging
-  video_early_init();
+static void early_log_init(void) {
+  serial_enable(SERIAL_PORT_A);
+}
 
+static inline void boot_init(uint32_t magic, uint32_t addr) {
   // Init multiboot structure
   multiboot_init(magic, addr);
 
@@ -99,18 +102,30 @@ int kenter(uint32_t magic, uint32_t addr) {
           ((highest_address % GB) % MB) / KB, boot_info.heap_start,
           heap_size / KB, boot_info.video_phy_start, boot_info.video_start,
           (unsigned)boot_info.video_type, fb_size / KB);
+}
 
-  // Initialization
-  pmm_init(&boot_info);
-  vmm_init(&boot_info);
-  mmu_init(&boot_info);
+int kenter(uint32_t magic, uint32_t addr) {
+  // Early init for logging
+  early_log_init();
+  video_early_init();
 
+  // Setup boot_info
+  boot_init(magic, addr);
+
+  // Setup prerequisite hardware
   gdt_init();
   tss_init(5, 0x10);
   idt_init();
   pic_init();
   pit_init();
+  rtc_init();
 
+  // Memory management
+  pmm_init(&boot_info);
+  vmm_init(&boot_info);
+  mmu_init(&boot_info);
+
+  // Graphic
   video_init(&boot_info);
 
   enable_interrupts();

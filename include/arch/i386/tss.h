@@ -42,7 +42,7 @@ extern void tss_flush();
 ///        example).
 /// @param idx Index.
 /// @param ss0 Kernel data segment.
-void tss_init(uint8_t idx, uint32_t ss0);
+void tss_init(uint8_t gdt_idx, uint32_t ss0);
 
 /// @brief This function is used to set the esp the kernel should be using.
 /// @param kss  Kernel data segment.

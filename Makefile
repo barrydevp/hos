@@ -69,7 +69,11 @@ ARCH_HDRS += $(wildcard include/arch/${ARCH}/*/*.h)
 # MODULES = $(patsubst modules/%.c,$(BASE)/mod/%.ko,$(foreach mod,$(ARCH_ENABLED_MODS),modules/$(mod).c))
 
 EMU = qemu-system-${ARCH}
-EMU_FLAGS = -m 1096M
+EMU_FLAGS ?= -m 256M
+
+ifeq ($(DEBUG), 1)
+	EMU_FLAGS += -s -S
+endif
 
 APPS=$(patsubst $(SRC)/apps/%.c,%,$(wildcard apps/*.c))
 APPS_X=$(foreach app,$(APPS),$(BASE)/bin/$(app))
@@ -106,11 +110,11 @@ all: qemu-kernel
 
 all-c: qemu-c-kernel
 
-all-cd: qemu-c-kernel-debug
-
 all-cgui: qemu-c-kernel-gui
 
-PHONY += qemu-kernel qemu-c-kernel qemu-c-kernel-debug + qemu-c-kernel-gui
+all-cvnc: qemu-c-kernel-vnc
+
+PHONY += qemu-kernel qemu-c-kernel qemu-c-kernel-gui qemu-c-kernel-vnc
 
 qemu-kernel: hos.kernel
 	$(EMU) $(EMU_FLAGS) -nographic -curses -kernel $^
@@ -118,16 +122,19 @@ qemu-kernel: hos.kernel
 
 qemu-c-kernel: hos.iso
 	# $(EMU) $(EMU_FLAGS) -nographic -curses -serial file:c.kernel.log -kernel $^
-	$(EMU) $(EMU_FLAGS) -nographic -curses -serial file:c.kernel.log -cdrom $^
+	$(EMU) $(EMU_FLAGS) -nographic -curses -serial stdio -cdrom $^
 	# $(EMU) $(EMU_FLAGS) -nographic -curses -s -S -serial file:c.kernel.log -kernel $^
 	# $(EMU) $(EMU_FLAGS) -kernel $^ -s -S -serial file:c.kernel.log
 
-qemu-c-kernel-debug: hos.iso
-	# $(EMU) $(EMU_FLAGS) -nographic -curses -s -S -serial file:c.kernel.log -kernel $^
-	$(EMU) $(EMU_FLAGS) -nographic -curses -s -S -serial file:c.kernel.log -cdrom $^
-
 qemu-c-kernel-gui: hos.iso
-	$(EMU) $(EMU_FLAGS) -serial file:c.kernel.log -cdrom $^
+	$(EMU) $(EMU_FLAGS) -serial stdio -cdrom $^
+
+qemu-c-kernel-vnc: hos.iso
+	printf "change vnc password\n%s\n" 2901 | $(EMU) $(EMU_FLAGS) \
+		-vnc :0,password=on \
+		-serial file:c.kernel.log \
+		-monitor stdio \
+		-cdrom $^
 
 PHONY += hos.bin
 

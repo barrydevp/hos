@@ -9,21 +9,21 @@ extern void idt_load(uint32_t);
 static struct idt_descriptor idt[I86_MAX_INTERRUPTS];
 static struct idtr idtr;
 
-// array of function pointers to handle each interrupt
-static I86_IRQ_HANDLER isr_handlers[I86_MAX_INTERRUPTS];
-
-void isr_install_handler(uint32_t index, I86_IRQ_HANDLER handler) {
-  isr_handlers[index] = handler;
-}
+/** External IRQ management */
+#define IRQ_CHAIN_SIZE 16
+#define IRQ_CHAIN_DEPTH 4
+static irq_handler_t irq_routines[IRQ_CHAIN_SIZE * IRQ_CHAIN_DEPTH] = { NULL };
+// static const char * _irq_handler_descriptions[IRQ_CHAIN_SIZE * IRQ_CHAIN_DEPTH] = { NULL };
 
 /**
  * @brief Initialize a gate, since there's some address swizzling involved...
  */
-void idt_set_gate(uint32_t i, I86_IVT isr, uint16_t sel, uint8_t flags) {
+static void idt_set_gate(uint32_t i, interrupt_handler_t handler, uint16_t sel,
+                         uint8_t flags) {
   if (i > I86_MAX_INTERRUPTS)
     return;
 
-  uint32_t base = (uint32_t)isr;
+  uint32_t base = (uint32_t)handler;
 
   idt[i].base_lo = base & 0xffff;
   idt[i].base_hi = (base >> 16) & 0xffff;
@@ -114,6 +114,16 @@ void idt_init() {
 
   /** Flush the idtr register */
   idt_load((uint32_t)&idtr);
+}
+
+void irq_install_handler(uint32_t irq, irq_handler_t handler) {
+  for (size_t i = 0; i < IRQ_CHAIN_DEPTH; i++) {
+    if (irq_routines[i * IRQ_CHAIN_SIZE + irq])
+      continue;
+    irq_routines[i * IRQ_CHAIN_SIZE + irq] = handler;
+    // _irq_handler_descriptions[i * IRQ_CHAIN_SIZE + irq] = desc;
+    break;
+  }
 }
 
 static void panic(const char *desc, pt_regs *r, uint32_t faulting_address) {
@@ -262,17 +272,13 @@ static void _exception(pt_regs *r, const char *description) {
  * @param irq  Translated IRQ number
  */
 static void _handle_irq(pt_regs *r, uint32_t irq) {
-  // for (size_t i = 0; i < IRQ_CHAIN_DEPTH; i++) {
-  //   I86_IRQ_HANDLER handler = irq_routines[i * IRQ_CHAIN_SIZE + irq];
-  //   if (!handler)
-  //     break;
-  //   if (handler(r))
-  //     return;
-  // }
-
-  I86_IRQ_HANDLER handler = isr_handlers[irq];
-  if (handler(r) == IRQ_CONTINUE)
-    return;
+  for (size_t i = 0; i < IRQ_CHAIN_DEPTH; i++) {
+    irq_handler_t handler = irq_routines[i * IRQ_CHAIN_SIZE + irq];
+    if (!handler)
+      break;
+    if (handler(r))
+      return;
+  }
 
   /* Unhandled */
   irq_ack(irq);
@@ -283,7 +289,7 @@ static void _handle_irq(pt_regs *r, uint32_t irq) {
 #define IRQ(i) case i: _handle_irq(r,i-32); break;
 // clang-format on
 
-void isr_handler_inner(pt_regs *r) {
+static void isr_handler_inner(pt_regs *r) {
   // clang-format off
   switch (r->int_no) {
     EXC(0, "divide-by-zero");
@@ -322,23 +328,23 @@ void isr_handler_inner(pt_regs *r) {
     /* 31 is reserved */
 
     /* 16 IRQs that go to the general IRQ chain */
-    IRQ(32);
-    IRQ(33);
-    IRQ(34);
-    IRQ(35);
-    IRQ(36);
-    IRQ(37);
-    IRQ(38);
-    case 39:
+    IRQ(IRQ0);
+    IRQ(IRQ1);
+    IRQ(IRQ2);
+    IRQ(IRQ3);
+    IRQ(IRQ4);
+    IRQ(IRQ5);
+    IRQ(IRQ6);
+    case IRQ7:
       break; /* Except the spurious IRQ, just ignore that */
-    IRQ(40);
-    IRQ(41);
-    IRQ(42);
-    IRQ(43);
-    IRQ(44);
-    IRQ(45);
-    IRQ(46);
-    IRQ(47);
+    IRQ(IRQ8);
+    IRQ(IRQ9);
+    IRQ(IRQ10);
+    IRQ(IRQ11);
+    IRQ(IRQ12);
+    IRQ(IRQ13);
+    IRQ(IRQ14);
+    IRQ(IRQ15);
 
     /* Local interrupts that make it here. */
     case 123:
