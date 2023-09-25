@@ -4,6 +4,7 @@
 #include <arch/i386/pic.h>
 #include <arch/i386/pit.h>
 #include <arch/i386/rtc.h>
+#include <arch/i386/timer.h>
 #include <arch/i386/cpu.h>
 #include <arch/i386/serial.h>
 
@@ -119,6 +120,7 @@ int kenter(uint32_t magic, uint32_t addr) {
   pic_init();
   pit_init();
   rtc_init();
+  timer_init();
 
   // Memory management
   pmm_init(&boot_info);
@@ -127,6 +129,9 @@ int kenter(uint32_t magic, uint32_t addr) {
 
   // Graphic
   video_init(&boot_info);
+
+  // kernel init
+  kinit(&boot_info);
 
   enable_interrupts();
 

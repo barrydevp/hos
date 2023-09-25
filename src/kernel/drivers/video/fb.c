@@ -3,6 +3,7 @@
 
 #include <arch/i386/ports.h>
 #include <arch/i386/cpu.h>
+#include <arch/i386/timer.h>
 #include <kernel/types.h>
 #include <kernel/string.h>
 #include <kernel/math.h>
@@ -274,9 +275,9 @@ void fb_new_line() {
 }
 
 void fb_update() {
-  // if ((timer_get_ticks() % (TICKS_PER_SECOND / 2)) == 0) {
-  //   __fb_draw_cursor();
-  // }
+  if ((timer_get_ticks() % (TICKS_PER_SECOND / 2)) == 0) {
+    __fb_draw_cursor();
+  }
 }
 
 void fb_set_color(uint32_t fg, uint32_t bg) {

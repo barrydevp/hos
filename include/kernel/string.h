@@ -29,6 +29,11 @@ extern size_t strnlen(const char *s, size_t count);
 
 extern int atoi(const char *s);
 
+/// @brief Transforms the given amount of bytes to a readable string.
+/// @param bytes The bytes to turn to string.
+/// @return String representing the bytes in human readable form.
+const char *to_human_size(unsigned long bytes);
+
 // extern char *strtok_r(char *str, const char *delim, char **saveptr);
 //
 // extern void *__attribute__((malloc)) malloc(uintptr_t size);

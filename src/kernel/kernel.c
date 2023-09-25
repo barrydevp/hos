@@ -1,8 +1,21 @@
+#include <kernel/kernel.h>
+#include <kernel/process/scheduler.h>
 #include <kernel/drivers/video.h>
 
-/* This will force us to create a kernel entry function instead of jumping to
- * kernel.c:0x00 */
-void dummy_test_entrypoint() {
+/// Initial ESP.
+uintptr_t initial_esp = 0;
+
+boot_info_t *boot_info = NULL;
+
+int kinit(boot_info_t *_boot_info) {
+  boot_info = _boot_info;
+
+  // Set the initial esp.
+  initial_esp = boot_info->stack_base;
+
+  scheduler_init();
+
+  return kmain();
 }
 
 int kmain() {

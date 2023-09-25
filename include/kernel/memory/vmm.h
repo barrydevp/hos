@@ -8,6 +8,7 @@
 #include <kernel/types.h>
 #include <kernel/kernel.h>
 #include <kernel/boot.h>
+#include <kernel/list_head.h>
 #include <kernel/memory/pmm.h>
 
 #define PAGE_SIZE 4096
@@ -32,6 +33,7 @@
 #define PML_USER_ACCESS 0x07
 #define LARGE_PAGE_BIT 0x08
 #define PML_DIR_VADDR 0xFFFF0000
+#define PML_COW_BIT 0x200
 
 #define VMM_FLAG_KERNEL 0x01
 #define VMM_FLAG_WRITABLE 0x02
@@ -68,7 +70,8 @@ union PML {
     uint32_t accessed : 1;
     uint32_t dirty : 1;
     uint32_t reserved2 : 2;
-    uint32_t _available : 3;
+    uint32_t cow : 1;
+    uint32_t _available : 2;
     uint32_t frame : 20;
   } ptbits;
   uint32_t raw;
@@ -89,23 +92,6 @@ enum PAGE_PDE_FLAGS {
   I86_PDE_FRAME = 0x7FFFF000 //1111111111111111111000000000000
 };
 
-union PDE {
-  struct {
-    uint32_t present : 1;
-    uint32_t writable : 1;
-    uint32_t user : 1;
-    uint32_t writethrough : 1;
-    uint32_t nocache : 1;
-    uint32_t accessed : 1;
-    uint32_t reserved : 1;
-    uint32_t size : 1;
-    uint32_t global : 1;
-    uint32_t _available : 3;
-    uint32_t page : 20;
-  } bits;
-  uint32_t raw;
-};
-
 //! i86 architecture defines this format so be careful if you modify it
 enum PAGE_PTE_FLAGS {
   I86_PTE_PRESENT = 0x1, //0000000000000000000000000000001
@@ -120,33 +106,6 @@ enum PAGE_PTE_FLAGS {
   I86_PTE_LV4_GLOBAL = 0x200, //0000000000000000000001000000000
   I86_PTE_FRAME = 0x7FFFF000 //1111111111111111111000000000000
 };
-
-union PTE {
-  struct {
-    uint32_t present : 1;
-    uint32_t writable : 1;
-    uint32_t user : 1;
-    uint32_t reserved1 : 2;
-    uint32_t accessed : 1;
-    uint32_t dirty : 1;
-    uint32_t reserved2 : 2;
-    uint32_t _available : 3;
-    uint32_t page : 20;
-  } bits;
-  uint32_t raw;
-};
-
-// struct page {
-//   uint32_t frame;
-//   struct list_head sibling;
-//   uint32_t virtual;
-// };
-//
-// struct pages {
-//   uint32_t paddr;
-//   uint32_t number_of_frames;
-//   uint32_t vaddr;
-// };
 
 /// @brief A page table.
 /// @details
@@ -166,63 +125,81 @@ typedef struct page_directory_t {
 /// @brief Virtual Memory Area, used to store details of a process segment.
 typedef struct vm_area_struct_t {
   /// Memory descriptor associated.
-  // struct mm_struct_t *vm_mm;
+  struct mm_struct_t *vm_mm;
   /// Start address of the segment, inclusive.
   uint32_t vm_start;
   /// End address of the segment, exclusive.
   uint32_t vm_end;
+  /// List of memory areas.
+  list_head vm_list;
+  /// Permissions.
+  pgprot_t vm_page_prot;
   /// Flags.
   unsigned short vm_flags;
   /// rbtree node.
   // struct rb_node vm_rb;
 } vm_area_struct_t;
 
+/// @brief Memory Descriptor, used to store details about the memory of a user process.
+typedef struct mm_struct_t {
+  /// List of memory area (vm_area_struct reference).
+  list_head mmap_list;
+  // /// rbtree of memory area.
+  // struct rb_root mm_rb;
+  /// Last memory area used.
+  vm_area_struct_t *mmap_cache;
+  /// Process page directory.
+  page_directory_t *pgd;
+  /// Number of memory area.
+  int map_count;
+  /// List of mm_struct.
+  list_head mm_list;
+  /// CODE start.
+  uint32_t start_code;
+  /// CODE end.
+  uint32_t end_code;
+  /// DATA start.
+  uint32_t start_data;
+  /// DATA end.
+  uint32_t end_data;
+  /// HEAP start.
+  uint32_t start_brk;
+  /// HEAP end.
+  uint32_t brk;
+  /// STACK start.
+  uint32_t start_stack;
+  /// ARGS start.
+  uint32_t arg_start;
+  /// ARGS end.
+  uint32_t arg_end;
+  /// ENVIRONMENT start.
+  uint32_t env_start;
+  /// ENVIRONMENT end.
+  uint32_t env_end;
+  /// Number of mapped pages.
+  unsigned int total_vm;
+} mm_struct_t;
+
 void vmm_page_allocate(union PML *page, uint32_t flags);
 void vmm_page_map_addr(union PML *page, uint32_t flags, uintptr_t physAddr);
-void vmm_page_free(union PML *page);
 
-void vmm_ptable_allocate(union PML *pde, uint32_t flags);
+union PML *vmm_create_page(uintptr_t virtAddr, uint32_t flags);
+union PML *vmm_get_page(uintptr_t virtAddr);
+union PML *vmm_map_page(uintptr_t virtAddr, uintptr_t physAddr, uint32_t flags);
+uintptr_t vmm_r_get_phy_addr(uintptr_t virtAddr);
 
-union PML *vmm_create_page(uintptr_t virtAddr, int flags);
-union PML *vmm_map_page(uintptr_t virtAddr, uintptr_t physAddr, int flags);
+void vmm_map_area(uintptr_t virtAddr, uintptr_t physAddr, uint32_t size,
+                  uint32_t flags);
+void vmm_unmap_area(uintptr_t virtAddr, uint32_t size);
+void vmm_allocate_area(uintptr_t virtAddr, uint32_t size, uint32_t flags);
+void vmm_deallocate_area(uintptr_t virtAddr, uint32_t size);
 
 page_directory_t *vmm_get_kernel_directory(void);
 page_directory_t *vmm_get_directory(void);
-void vmm_set_directory(page_directory_t *new_pdir, uint32_t phy_addr);
+void vmm_switch_directory(page_directory_t *new_pdir);
 page_directory_t *vmm_clone_pdir(page_directory_t *from);
 
 void vmm_invalidate(uintptr_t addr);
+void paging_flush_tlb_single(uintptr_t addr);
 
 void vmm_init(struct boot_info_t *boot_info);
-
-// struct pdirectory *vmm_get_directory();
-// void vmm_map_address(struct pdirectory *dir, uint32_t virt, uint32_t phys,
-//                      uint32_t flags);
-// void vmm_unmap_address(struct pdirectory *va_dir, uint32_t virt);
-// void vmm_unmap_range(struct pdirectory *va_dir, uint32_t vm_start,
-//                      uint32_t vm_end);
-// void *create_kernel_stack(int32_t blocks);
-// struct pdirectory *vmm_create_address_space(struct pdirectory *dir);
-// uint32_t vmm_get_physical_address(uint32_t vaddr, bool is_page);
-// struct pdirectory *vmm_fork(struct pdirectory *va_dir);
-
-// // malloc.c
-// void *sbrk(size_t n);
-// void *kmalloc(size_t n);
-// void *kcalloc(size_t n, size_t size);
-// void *krealloc(void *ptr, size_t size);
-// void kfree(void *ptr);
-// void *kalign_heap(size_t size);
-//
-// // mmap.c
-// struct vm_area_struct *get_unmapped_area(uint32_t addr, uint32_t len);
-// int32_t do_mmap(uint32_t addr, size_t len, uint32_t prot, uint32_t flag,
-//                 int32_t fd, off_t off);
-// int do_munmap(struct mm_struct *mm, uint32_t addr, size_t len);
-// uint32_t do_brk(uint32_t addr, size_t len);
-//
-// // highmem.c
-// void kmap(struct page *p);
-// void kmaps(struct pages *p);
-// void kunmap(struct page *p);
-// void kunmaps(struct pages *p);

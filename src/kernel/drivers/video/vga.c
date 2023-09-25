@@ -5,6 +5,7 @@
 
 #include <arch/i386/ports.h>
 #include <arch/i386/cpu.h>
+#include <arch/i386/timer.h>
 #include <kernel/types.h>
 #include <kernel/string.h>
 #include <kernel/math.h>
@@ -775,9 +776,9 @@ void vga_new_line() {
 }
 
 void vga_update() {
-  // if ((timer_get_ticks() % (TICKS_PER_SECOND / 2)) == 0) {
-  //   __vga_draw_cursor();
-  // }
+  if ((timer_get_ticks() % (TICKS_PER_SECOND / 2)) == 0) {
+    __vga_draw_cursor();
+  }
 }
 
 void vga_set_color(unsigned int color) {

@@ -16,4 +16,6 @@
 
 #define RESYNC_TIME 1
 
+volatile uint64_t ticks;
+
 void pit_init(void);

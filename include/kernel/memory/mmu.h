@@ -1,18 +1,25 @@
 #pragma once
 #include <kernel/types.h>
 #include <kernel/boot.h>
+#include <kernel/memory/vmm.h>
 
 #define mmu_page_is_user_readable(p) (p->bits.user)
 #define mmu_page_is_user_writable(p) (p->bits.writable)
 
-void mmu_init(boot_info_t* boot_info_t);
+void mmu_init(boot_info_t *boot_info_t);
+uint32_t mmu_create_vm_area(mm_struct_t *mm, uint32_t virt_start, size_t size,
+                            uint32_t pgflags);
+uint32_t mmu_clone_vm_area(mm_struct_t *mm, vm_area_struct_t *area, int cow);
+mm_struct_t *mmu_create_blank_process_image(size_t stack_size);
+mm_struct_t *mmu_clone_process_image(mm_struct_t *mm);
+void mmu_destroy_process_image(mm_struct_t *mm);
 
 void *sbrk(size_t bytes);
 
 /** kheap.c */
 /// @brief Initialize heap.
 /// @param initial_size Starting size.
-void kheap_init(boot_info_t* boot_info);
+void kheap_init(boot_info_t *boot_info);
 
 /// @brief Increase the heap of the kernel.
 /// @param increment The amount to increment.

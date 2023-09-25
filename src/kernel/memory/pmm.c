@@ -1,6 +1,5 @@
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/vmm.h>
-#include <kernel/multiboot.h>
 #include <kernel/arch.h>
 #include <kernel/string.h>
 
@@ -267,20 +266,6 @@ void pmm_free_frame(uintptr_t frame_addr) {
 void pmm_init_test(uint32_t *frames_list, uint32_t size) {
   frames_bitmap = frames_list;
   max_frames = size * 32;
-}
-
-void pmm_regions(struct multiboot_tag_mmap *multiboot_mmap) {
-  for (struct multiboot_mmap_entry *mmap = multiboot_mmap->entries;
-       (multiboot_uint8_t *)mmap <
-       (multiboot_uint8_t *)multiboot_mmap + multiboot_mmap->size;
-       mmap = (struct multiboot_mmap_entry *)((uint32_t)mmap +
-                                              multiboot_mmap->entry_size)) {
-    if (mmap->type > 4 && mmap->addr == 0)
-      break;
-
-    if (mmap->type == 1)
-      pmm_init_region(mmap->addr, mmap->len);
-  }
 }
 
 void pmm_init_region(uintptr_t addr, uint32_t length) {
