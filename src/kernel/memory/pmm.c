@@ -305,16 +305,18 @@ void pmm_init(struct boot_info_t *boot_info) {
 
   memsize = boot_info->highest_address;
 
-  uint32_t addressable_phy = FRAME_ALIGN(boot_info->kernel_phy_end);
-  uint32_t addressable = FRAME_ALIGN(boot_info->kernel_end);
+  uint32_t addressable_phy = __ALIGN_UP(boot_info->kernel_phy_end, sizeof(uint32_t));
+  uint32_t addressable = __ALIGN_UP(boot_info->kernel_end, sizeof(uint32_t));
 
   /* Setup page allocator frames bitmap */
   max_frames = (memsize >> FRAME_SHIFT) + 1;
   frames_bitmap_size =
     (FRAME_INDEX(max_frames - 1) + 1) * sizeof(*frames_bitmap);
-  // we want frames_bitmap frame(page) aligned, bitmap fully fit into n frames(pages),
-  // in another words, n frames(pages) contain only bitmap data
-  frames_bitmap_size = FRAME_ALIGN(frames_bitmap_size);
+
+  // // we want frames_bitmap frame(page) aligned, bitmap fully fit into n frames(pages),
+  // // in another words, n frames(pages) contain only bitmap data
+  // frames_bitmap_size = FRAME_ALIGN(frames_bitmap_size);
+
   /* Allocate bitmap from KERNEL_END (KERNEL_HEAP_STRART?) */
   // ALERT!: As we are already in paging mode and pmm_init run before vmm_init
   // so in order to run next following line, frame bitmap setup,

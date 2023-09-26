@@ -85,20 +85,20 @@ static inline void boot_init(uint32_t magic, uint32_t addr) {
   boot_info.heap_start = KERNEL_HEAP_START;
   boot_info.heap_end = KERNEL_HEAP_END;
   uint32_t heap_size = boot_info.heap_end - boot_info.heap_start;
-  if (heap_size > addressable_size) {
-    dprintf("Low kernel heap memory:\n"
-            " available: %uKB\n"
-            " desired: %uKB\n",
-            __ALIGN_DOWN(addressable_size, PAGE_SIZE) / KB, heap_size / KB);
-    boot_info.heap_end =
-      boot_info.heap_start + __ALIGN_DOWN(addressable_size, PAGE_SIZE);
-    heap_size = boot_info.heap_end - boot_info.heap_start;
-  }
+  // if (heap_size > addressable_size) {
+  //   dprintf("Low kernel heap memory:\n"
+  //           " available: %uKB\n"
+  //           " desired: %uKB\n",
+  //           __ALIGN_DOWN(addressable_size, PAGE_SIZE) / KB, heap_size / KB);
+  //   boot_info.heap_end =
+  //     boot_info.heap_start + __ALIGN_DOWN(addressable_size, PAGE_SIZE);
+  //   heap_size = boot_info.heap_end - boot_info.heap_start;
+  // }
 
   dprintf("Memory summary: \n"
           " total: %uGB + %uMB + %uKB\n"
           " heap: virt=0x%p (%uKB)\n"
-          " framebuffer: phy=0x%p virt=0x%p type=%u (%uKB)\n",
+          " video: phy=0x%p virt=0x%p type=%u (%uKB)\n",
           highest_address / GB, (highest_address % GB) / MB,
           ((highest_address % GB) % MB) / KB, boot_info.heap_start,
           heap_size / KB, boot_info.video_phy_start, boot_info.video_start,

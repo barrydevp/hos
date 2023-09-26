@@ -29,13 +29,19 @@ extern void *_kernel_end;
 
 #define KERNEL_LOW_SIZE 896 // MB
 #define KERNEL_STACK_SIZE 0x100000 // 1MB
-#define KERNEL_HEAP_END 0xF0000000
 #define KERNEL_HEAP_START 0xD0000000
+#define KERNEL_HEAP_END 0xF0000000 // 256MB
 #define USER_HEAP_START 0x00000000
 #define USER_HEAP_END 0x40000000
 #define USER_START 0x0
 #define USER_END KERNEL_HIGHER_HALF
 #define FRAMEBUFFER_START KERNEL_HEAP_END
+// Page table mapping virtual space is used for temporarily map
+// page table. That is useful when we need to access two page directory
+// at a time. e.g. copy two pdir (accessing one by recursive map and one
+// by this offset map)
+#define PAGE_TABLE_MAP_START 0xCFC00000
+#define PAGE_TABLE_MAP_END KERNEL_HEAP_END // 4MB
 
 #define KERNEL_PDE_START 768 // virtAddress from 0xC0000000
 #define KERNEL_INIT_NPDE 1 // we use one PDE mean one page table (4MB)

@@ -73,7 +73,7 @@ static inline char **__push_args_on_stack(uintptr_t *stack, char *args[]) {
 static int __reset_process(task_struct *task) {
   dprintf("__reset_process(%p `%s`)\n", task, task->name);
   // Create a new stack segment.
-  task->mm = create_blank_process_image(DEFAULT_STACK_SIZE);
+  task->mm = mmu_create_blank_process_image(DEFAULT_STACK_SIZE);
   if (task->mm == NULL) {
     dprintf("Failed to initialize process mm structure.\n");
     return 0;
@@ -119,7 +119,7 @@ static int __load_executable(const char *path, task_struct *task,
   // only when all the threads are terminated. This can be accomplished by using
   // an internal counter on the mm.
   if (task->mm)
-    destroy_process_image(task->mm);
+    mmu_destroy_process_image(task->mm);
   // Return code variable.
   int ret = 0;
   // Recreate the memory of the process.

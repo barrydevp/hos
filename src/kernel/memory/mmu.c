@@ -12,8 +12,6 @@ uint32_t create_vm_area(mm_struct_t *mm, uint32_t virt_start, size_t size,
   // vm_area_struct_t *new_segment = kmem_cache_alloc(vm_area_cache, GFP_KERNEL);
   vm_area_struct_t *new_segment = kmalloc(sizeof(vm_area_struct_t));
 
-  uint32_t order = find_nearest_order_greater(virt_start, size);
-
   uint32_t phy_vm_start;
 
   // if (pgflags & MM_COW) {
