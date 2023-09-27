@@ -3,6 +3,8 @@
 #include <arch/i386/pic.h>
 #include <kernel/string.h>
 #include <kernel/printf.h>
+#include <kernel/arch.h>
+#include <kernel/system/syscall.h>
 
 extern void idt_load(uint32_t);
 
@@ -10,7 +12,7 @@ static struct idt_descriptor idt[I86_MAX_INTERRUPTS];
 static struct idtr idtr;
 
 /** External IRQ management */
-#define IRQ_CHAIN_SIZE 16
+#define IRQ_CHAIN_SIZE  16
 #define IRQ_CHAIN_DEPTH 4
 static irq_handler_t irq_routines[IRQ_CHAIN_SIZE * IRQ_CHAIN_DEPTH] = { NULL };
 // static const char * _irq_handler_descriptions[IRQ_CHAIN_SIZE * IRQ_CHAIN_DEPTH] = { NULL };
@@ -25,10 +27,10 @@ static void idt_set_gate(uint32_t i, interrupt_handler_t handler, uint16_t sel,
 
   uint32_t base = (uint32_t)handler;
 
-  idt[i].base_lo = base & 0xffff;
-  idt[i].base_hi = (base >> 16) & 0xffff;
-  idt[i].flags = flags;
-  idt[i].sel = sel;
+  idt[i].base_lo  = base & 0xffff;
+  idt[i].base_hi  = (base >> 16) & 0xffff;
+  idt[i].flags    = flags;
+  idt[i].sel      = sel;
   idt[i].reserved = 0;
 }
 
@@ -45,7 +47,7 @@ static void idt_default_handler(pt_regs *regs) {
 
 void idt_init() {
   idtr.limit = sizeof(idt);
-  idtr.base = (uint32_t)idt;
+  idtr.base  = (uint32_t)idt;
 
   memset(idt, 0, sizeof(idt));
 
@@ -244,6 +246,32 @@ static void _page_fault(pt_regs *r) {
   //
   // /* Otherwise, segfault the current process. */
   // send_signal(this_core->current_process->id, SIGSEGV, 1);
+
+  arch_fatal();
+}
+
+/**
+ * @brief Legacy system call entrypoint.
+ *
+ * We don't have a non-legacy entrypoint, but this use of
+ * an interrupt to make syscalls is considered "legacy"
+ * by the existence of its replacement (SYSCALL/SYSRET).
+ *
+ * @param r Interrupt register context, which contains syscall arguments.
+ * @return Register state after system call, which contains return value.
+ */
+static pt_regs *_syscall_entrypoint(pt_regs *r) {
+  /* syscall_handler will modify r to set return value. */
+  syscall_handler(r);
+
+  /*
+   * I'm not actually sure if we're still cli'ing in any of the
+   * syscall handlers, but definitely make sure we're not allowing
+   * interrupts to remain disabled upon return from a system call.
+   */
+  asm volatile("sti");
+
+  return r;
 }
 
 /**
@@ -349,10 +377,11 @@ static void isr_handler_inner(pt_regs *r) {
     /* Local interrupts that make it here. */
     case 123:
       // return _local_timer(r);
-    case 127:
-      // return _syscall_entrypoint(r);
+    case 80:
+      _syscall_entrypoint(r);
+      break;
 
-      /* Other interrupts that don't make it here:
+    /* Other interrupts that don't make it here:
      *   124: TLB shootdown, we just reload CR3 in the handler.
      *   125: Fatal signal, jumps straight to a cli/hlt loop, though I
      * think this just yields an NMI instead? 126: Quiet wakeup, do we

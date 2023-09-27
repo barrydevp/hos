@@ -75,8 +75,9 @@ ifeq ($(DEBUG), 1)
 	EMU_FLAGS += -s -S
 endif
 
-APPS=$(patsubst $(SRC)/apps/%.c,%,$(wildcard apps/*.c))
+APPS=$(patsubst apps/%.c,%,$(wildcard apps/*.c))
 APPS_X=$(foreach app,$(APPS),$(BASE)/bin/$(app))
+APPS_X_O=$(foreach app,$(APPS),$(BASE)/bin/$(app).o)
 APPS_Y=$(foreach app,$(APPS),.make/$(app).mak)
 APPS_SH=$(patsubst apps/%.sh,%.sh,$(wildcard apps/*.sh))
 APPS_SH_X=$(foreach app,$(APPS_SH),$(BASE)/bin/$(app))
@@ -86,10 +87,12 @@ LIBS_X=$(foreach lib,$(LIBS),$(BASE)/lib/libtoaru_$(lib).so)
 LIBS_Y=$(foreach lib,$(LIBS),.make/$(lib).lmak)
 
 # CFLAGS for user mode
-CFLAGS  = -O2 -g
+# CFLAGS  = -O2 -g
+CFLAGS  = -O2
 CFLAGS += -Wall -Wextra -Wno-unused-parameter
-CFLAGS += -I. -Iapps
-CFLAGS += -fplan9-extensions ${ARCH_USER_CFLAGS}
+CFLAGS += -Iapps
+# CFLAGS += -fplan9-extensions ${ARCH_USER_CFLAGS}
+CFLAGS += -ffreestanding -nostdlib
 
 LIBC_OBJS  = $(patsubst %.c,%.o,$(wildcard $(SRC)/libc/*.c))
 LIBC_OBJS += $(patsubst %.c,%.o,$(wildcard $(SRC)/libc/*/*.c))
@@ -146,8 +149,8 @@ hos.bin: hos.c.kernel
 	-mkdir -p isodir/boot/grub
 	-cp hos.c.kernel isodir/boot/hos.bin
 
-hos.c.kernel: $(KERNEL_LINKERLD) $(KERNEL_OBJS) $(ARCH_OBJS)
-	$(CC) -T $(KERNEL_LINKERLD) $(K_LDFLAGS) -o $@ $(ARCH_OBJS) $(KERNEL_OBJS)
+hos.c.kernel: $(KERNEL_LINKERLD) $(KERNEL_OBJS) $(ARCH_OBJS) $(APPS_X_O)
+	$(CC) -T $(KERNEL_LINKERLD) $(K_LDFLAGS) -o $@ $(ARCH_OBJS) $(KERNEL_OBJS) $(APPS_X_O)
 
 hos.kernel: $(KERNEL_LINKERLD) $(ARCH_OBJS) $(CRTS)
 	$(CC) -T $(KERNEL_LINKERLD) $(K_CFLAGS) -nostdlib -o $@ $(ARCH_OBJS) $(CRTS) $(RS_KERNEL_LIB)
@@ -190,6 +193,7 @@ clean:
 	-rm -f hos.kernel
 	-rm -rf isodir
 	-rm -f hos.iso
+
 
 $(BASE)/lib/ld.so: linker/linker.c $(BASE)/lib/libc.a | dirs $(LIBC)
 	$(CC) -g -static -Wl,-static $(CFLAGS) -z max-page-size=0x1000 -o $@ -Os -T linker/link.ld $<
@@ -263,8 +267,25 @@ $(BASE)/bin/%.sh: apps/%.sh
 PHONY += libs
 libs: $(LIBS_X)
 
-PHONY += apps
-apps: $(APPS_X)
+.PRECIOUS: apps/%.o $(APPS_X)
+
+PHONY += apps clean-app
+apps: $(APPS_X_O)
+
+clean-app:
+	-rm -f ${APPS_X} ${APPS_X_O}
+
+APP_HDRS = $(wildcard apps/*.h)
+APP_LINKERLD = $(APP_SRC)/linker.ld
+
+$(BASE)/bin/%.o: $(BASE)/bin/%
+	objcopy -I binary -O elf32-i386 -B i386 $< $@ 
+
+$(BASE)/bin/%: $(APP_SRC)/%.o $(APP_HDRS) $(APP_LINKERLD)
+	${CC} -T $(APP_LINKERLD) ${CFLAGS} -Iapps -o $@ $<
+
+$(APP_SRC)/%.o: $(APP_SRC)/%.c $(APP_HDRS) $(APP_LINKERLD)
+	${CC} -T $(APP_LINKERLD) ${CFLAGS} -Iapps -c -o $@ $<
 
 TESTFLAGS := -std=gnu99 \
         -I tests/include \

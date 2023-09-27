@@ -127,4 +127,5 @@ IRQ 14, 46
 IRQ 15, 47
 
 /* syscall entry point */
+ISR_NOERR 80
 ISR_NOERR 127

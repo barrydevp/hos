@@ -8,5 +8,6 @@
 *.log
 *.iso
 /target
+/base/bin
 Cargo.lock
 isodir

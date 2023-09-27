@@ -171,3 +171,5 @@ int tasking_init();
 /// @param path Path of the `init` program.
 /// @return Pointer to init process.
 task_struct *process_create_init(const char *path);
+
+task_struct *create_task_test(const char *name);

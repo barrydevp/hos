@@ -4,10 +4,10 @@
 
 #include <kernel/printf.h>
 
-#define get_page_directory_index(x) (((x) >> 22) & 0x3ff)
+#define get_page_directory_index(x)   (((x) >> 22) & 0x3ff)
 #define get_page_table_entry_index(x) (((x) >> 12) & 0x3ff)
-#define get_aligned_address(x) (x & ~0xfff)
-#define is_page_enabled(x) (x & 0x1)
+#define get_aligned_address(x)        (x & ~0xfff)
+#define is_page_enabled(x)            (x & 0x1)
 
 /* Initial memory maps loaded by boostrap */
 #define _pagemap __attribute__((aligned(PAGE_SIZE))) = { 0 }
@@ -61,7 +61,7 @@ static inline void vmm_page_set_flags(union PML *page, uint32_t flags) {
  */
 void vmm_page_allocate(union PML *page, uint32_t flags) {
   if (page->ptbits.frame == 0) {
-    uint32_t index = pmm_allocate_frame();
+    uint32_t index     = pmm_allocate_frame();
     page->ptbits.frame = index;
   }
   vmm_page_set_flags(page, flags);
@@ -86,7 +86,7 @@ void vmm_page_map_addr(union PML *page, uint32_t flags, uintptr_t physAddr) {
  */
 void vmm_pde_allocate(union PML *pde, uint32_t flags) {
   if (pde->pdbits.frame == 0) {
-    uint32_t index = pmm_allocate_frame();
+    uint32_t index    = pmm_allocate_frame();
     pde->pdbits.frame = index;
   }
   vmm_page_set_flags(pde, flags);
@@ -126,7 +126,7 @@ static inline uintptr_t __get_cr3(void) {
 }
 
 static inline void __set_cr3(uintptr_t cr3) {
-  asm volatile("movl %0, %%cr3" : : "r"(cr3));
+  asm volatile("mov %0, %%cr3" : : "r"(cr3));
 }
 
 /**
@@ -148,16 +148,17 @@ void vmm_switch_directory(page_directory_t *new_pdir) {
 
   cur_pdir = new_pdir;
   // k_core->current_pml = new_pdir;
-  uint32_t pdir_page = new_pdir->entries[1023].raw;
+  uint32_t pdir_phy_addr = new_pdir->entries[1023].raw;
+  dprintf("Switch page directory to: 0x%p\n", pdir_phy_addr & FRAME_MASK);
 
-  __set_cr3(pdir_page & FRAME_MASK);
+  __set_cr3(pdir_phy_addr & FRAME_MASK);
 }
 
 /// @brief Get physical address (frame address) mapping of virtual address.
 /// @param virtAddr Virtual address.
 /// @return The frame address.
 uintptr_t vmm_r_get_phy_addr(uintptr_t virtAddr) {
-  page_table_t *pt = vmm_r_get_ptable(virtAddr);
+  page_table_t *pt  = vmm_r_get_ptable(virtAddr);
   uint32_t pt_entry = (virtAddr >> PAGE_SHIFT) & ENTRY_MASK;
 
   uintptr_t phyAddr = pt->pages[pt_entry].raw;
@@ -205,12 +206,13 @@ page_directory_t *vmm_clone_pdir(page_directory_t *from) {
  *          an intermediary paging level and @p flags did not have @c MMU_GET_MAKE set.
  */
 union PML *vmm_create_page(uintptr_t virtAddr, uint32_t flags) {
+  virtAddr           = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
   uintptr_t pageAddr = virtAddr >> PAGE_SHIFT;
-  uint32_t pd_entry = (pageAddr >> 10) & ENTRY_MASK;
-  uint32_t pt_entry = (pageAddr)&ENTRY_MASK;
+  uint32_t pd_entry  = (pageAddr >> 10) & ENTRY_MASK;
+  uint32_t pt_entry  = (pageAddr)&ENTRY_MASK;
 
   page_directory_t *pd = vmm_r_get_directory();
-  page_table_t *pt = vmm_r_get_ptable(virtAddr);
+  page_table_t *pt     = vmm_r_get_ptable(virtAddr);
 
   /* Setup page table */
   if (!pd->entries[pd_entry].pdbits.present) {
@@ -249,12 +251,13 @@ union PML *vmm_create_page(uintptr_t virtAddr, uint32_t flags) {
  *          an intermediary paging level and @p flags did not have @c MMU_GET_MAKE set.
  */
 union PML *vmm_get_page(uintptr_t virtAddr) {
+  virtAddr           = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
   uintptr_t pageAddr = virtAddr >> PAGE_SHIFT;
-  uint32_t pd_entry = (pageAddr >> 10) & ENTRY_MASK;
-  uint32_t pt_entry = (pageAddr)&ENTRY_MASK;
+  uint32_t pd_entry  = (pageAddr >> 10) & ENTRY_MASK;
+  uint32_t pt_entry  = (pageAddr)&ENTRY_MASK;
 
   page_directory_t *pd = vmm_r_get_directory();
-  page_table_t *pt = vmm_r_get_ptable(virtAddr);
+  page_table_t *pt     = vmm_r_get_ptable(virtAddr);
 
   /* Setup page table */
   if (!pd->entries[pd_entry].pdbits.present) {
@@ -279,12 +282,13 @@ _noentry:
 
 union PML *vmm_map_page(uintptr_t virtAddr, uintptr_t physAddr,
                         uint32_t flags) {
+  virtAddr           = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
   uintptr_t pageAddr = virtAddr >> PAGE_SHIFT;
-  uint32_t pd_entry = (pageAddr >> 10) & ENTRY_MASK;
-  uint32_t pt_entry = (pageAddr)&ENTRY_MASK;
+  uint32_t pd_entry  = (pageAddr >> 10) & ENTRY_MASK;
+  uint32_t pt_entry  = (pageAddr)&ENTRY_MASK;
 
   page_directory_t *pd = vmm_get_directory();
-  page_table_t *pt = vmm_r_get_ptable(virtAddr);
+  page_table_t *pt     = vmm_r_get_ptable(virtAddr);
 
   /* Setup page table */
   if (!pd->entries[pd_entry].pdbits.present) {
@@ -306,19 +310,22 @@ union PML *vmm_map_page(uintptr_t virtAddr, uintptr_t physAddr,
 }
 
 void vmm_map_range(uintptr_t virtAddr, uintptr_t physAddr, uint32_t size,
-                  uint32_t flags) {
-  for (uint32_t i_virt = 0; i_virt < size; i_virt += PAGE_SIZE) {
-    vmm_map_page(virtAddr + i_virt, physAddr + i_virt, flags);
+                   uint32_t flags) {
+  uintptr_t startAddr = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
+  uintptr_t endAddr   = __ALIGN_UP(virtAddr + size, PAGE_SIZE);
+  for (; startAddr < endAddr; startAddr += PAGE_SIZE) {
+    vmm_map_page(startAddr, endAddr, flags);
   }
 }
 
 void vmm_unmap_page(uintptr_t virtAddr) {
+  virtAddr           = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
   uintptr_t pageAddr = virtAddr >> PAGE_SHIFT;
-  uint32_t pd_entry = (pageAddr >> 10) & ENTRY_MASK;
-  uint32_t pt_entry = (pageAddr)&ENTRY_MASK;
+  uint32_t pd_entry  = (pageAddr >> 10) & ENTRY_MASK;
+  uint32_t pt_entry  = (pageAddr)&ENTRY_MASK;
 
   page_directory_t *pd = vmm_get_directory();
-  page_table_t *pt = vmm_r_get_ptable(virtAddr);
+  page_table_t *pt     = vmm_r_get_ptable(virtAddr);
 
   /* Setup page table */
   if (!pd->entries[pd_entry].pdbits.present) {
@@ -336,12 +343,13 @@ __return:
 }
 
 void vmm_free_page(uintptr_t virtAddr) {
+  virtAddr           = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
   uintptr_t pageAddr = virtAddr >> PAGE_SHIFT;
-  uint32_t pd_entry = (pageAddr >> 10) & ENTRY_MASK;
-  uint32_t pt_entry = (pageAddr)&ENTRY_MASK;
+  uint32_t pd_entry  = (pageAddr >> 10) & ENTRY_MASK;
+  uint32_t pt_entry  = (pageAddr)&ENTRY_MASK;
 
   page_directory_t *pd = vmm_get_directory();
-  page_table_t *pt = vmm_r_get_ptable(virtAddr);
+  page_table_t *pt     = vmm_r_get_ptable(virtAddr);
 
   /* Setup page table */
   if (!pd->entries[pd_entry].pdbits.present) {
@@ -358,31 +366,33 @@ void vmm_free_page(uintptr_t virtAddr) {
 }
 
 void vmm_unmap_range(uintptr_t virtAddr, uint32_t size) {
-  size = __ALIGN_DOWN(size, PAGE_SIZE);
-
   // unmap page without free frame
-  for (uint32_t i_virt = 0; i_virt < size; i_virt += PAGE_SIZE) {
-    vmm_unmap_page(virtAddr + i_virt);
+  uintptr_t startAddr = __ALIGN_UP(virtAddr, PAGE_SIZE);
+  uintptr_t endAddr   = __ALIGN_DOWN(virtAddr + size, PAGE_SIZE);
+  for (; startAddr < endAddr; startAddr += PAGE_SIZE) {
+    vmm_unmap_page(startAddr);
   }
 }
 
 void vmm_allocate_range(uintptr_t virtAddr, uint32_t size, uint32_t flags) {
-  for (uint32_t i_virt = 0; i_virt < size; i_virt += PAGE_SIZE) {
-    vmm_create_page(virtAddr + i_virt, flags);
+  uintptr_t startAddr = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
+  uintptr_t endAddr   = __ALIGN_UP(virtAddr + size, PAGE_SIZE);
+  for (; startAddr < endAddr; startAddr += PAGE_SIZE) {
+    vmm_create_page(startAddr, flags);
   }
 }
 
 void vmm_deallocate_range(uintptr_t virtAddr, uint32_t size) {
-  size = __ALIGN_DOWN(size, PAGE_SIZE);
-
   // free page and its associated frame
-  for (uint32_t i_virt = 0; i_virt < size; i_virt += PAGE_SIZE) {
-    vmm_free_page(virtAddr + i_virt);
+  uintptr_t startAddr = __ALIGN_UP(virtAddr, PAGE_SIZE);
+  uintptr_t endAddr   = __ALIGN_DOWN(virtAddr + size, PAGE_SIZE);
+  for (; startAddr < endAddr; startAddr += PAGE_SIZE) {
+    vmm_free_page(startAddr);
   }
 
   // free ptable and its associated frame
-  uint32_t pd_i = (__ALIGN_UP(virtAddr, PAGE_SIZE) >> 20) & ENTRY_MASK;
-  uint32_t pd_e = pd_i + (size >> 20);
+  uint32_t pd_i        = (__ALIGN_UP(virtAddr, PAGE_SIZE) >> 20) & ENTRY_MASK;
+  uint32_t pd_e        = pd_i + (size >> 20);
   page_directory_t *pd = vmm_get_directory();
   for (; pd_i < pd_e; ++pd_i) {
     if (pd->entries[pd_i].pdbits.present) {
@@ -397,8 +407,8 @@ void vmm_init(struct boot_info_t *boot_info) {
   // log("VMM: Initializing");
 
   // allocate page directory
-  k_pdir = (page_directory_t *)init_page_region[0];
-  cur_pdir = k_pdir;
+  k_pdir               = (page_directory_t *)init_page_region[0];
+  cur_pdir             = k_pdir;
   uintptr_t k_phy_pdir = __get_cr3();
 
   /** unmap the identity mapping first 4MB */
@@ -417,16 +427,17 @@ void vmm_init(struct boot_info_t *boot_info) {
 
   /* Allocate page for pmm used region */
   // FIXME: another approach in future
-  uint32_t pmm_used = 128 * KB; // for bitmap
+  uint32_t pmm_used  = PAGE_ALIGN(128 * KB); // for bitmap
   uint32_t pmm_start = FRAME_ALIGN(boot_info->lowmem_phy_end);
   for (uint32_t i_virt = 0; i_virt < pmm_used; i_virt += PAGE_SIZE) {
     vmm_create_page(pmm_start + i_virt, PML_KERNEL_ACCESS);
   }
 
   /* Map page for video region */
-  uint32_t video_size = (boot_info->video_end - boot_info->video_start);
+  uint32_t video_size =
+    PAGE_ALIGN(boot_info->video_end - boot_info->video_start);
   vmm_map_range(boot_info->video_start, boot_info->video_phy_start, video_size,
-               PML_USER_ACCESS);
+                PML_USER_ACCESS);
   // for (uint32_t i_virt = 0; i_virt < video_size; i_virt += PAGE_SIZE) {
   //   vmm_map_page(boot_info->video_start + i_virt,
   //                boot_info->video_phy_start + i_virt, PML_USER_ACCESS);

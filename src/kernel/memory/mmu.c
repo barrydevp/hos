@@ -9,10 +9,10 @@ static inline void __allocate_vm_area(vm_area_struct_t *area,
   page_directory_t *pd = area->vm_mm->pgd;
 
   uintptr_t addr_start = area->vm_start;
-  uintptr_t addr_end   = addr_start + size_alloc;
+  uintptr_t addr_end   = PAGE_ALIGN(addr_start + size_alloc);
 
   uint32_t pfn_start = (addr_start >> PAGE_SHIFT);
-  uint32_t pfn_end   = (PAGE_ALIGN(addr_end) >> PAGE_SHIFT);
+  uint32_t pfn_end   = (addr_end >> PAGE_SHIFT);
   uint32_t pde_start = (pfn_start >> 10) & ENTRY_MASK;
   uint32_t pde_end   = (pfn_end >> 10) & ENTRY_MASK;
 
@@ -272,7 +272,10 @@ mm_struct_t *mmu_create_blank_process_image(size_t stack_size) {
   page_directory_t *pdir_cpy = kmalloc(sizeof(page_directory_t));
   memcpy(pdir_cpy, vmm_get_kernel_directory(), sizeof(page_directory_t));
   // recursive mapping
-  pdir_cpy->entries[1023].raw = vmm_r_get_phy_addr((uintptr_t)pdir_cpy);
+  // pdir_cpy->entries[1023].raw =
+  //   vmm_r_get_phy_addr((uintptr_t)pdir_cpy) | PML_USER_ACCESS;
+  pdir_cpy->entries[1023].raw = vmm_r_get_phy_addr((uintptr_t)pdir_cpy) |
+                                PML_KERNEL_ACCESS;
 
   mm_new->pgd = pdir_cpy;
 

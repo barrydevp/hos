@@ -276,6 +276,10 @@ static inline int elf_load_exec(elf_header_t *header, task_struct *task) {
   return true;
 }
 
+int elf_load_exec0(elf_header_t *header, task_struct *task) {
+  return elf_load_exec(header, task);
+}
+
 int elf_load_file(task_struct *task, vfs_file_t *file, uint32_t *entry) {
   // Open the file.
   if (file == NULL)

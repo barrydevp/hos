@@ -3,6 +3,17 @@
 #include <kernel/types.h>
 #include <kernel/process/task.h>
 
+/// @brief Define variables pointing to external symbols, specifically
+///        to the .data section of a linked object file.
+#define EXTLD(NAME)                                                            \
+  extern const unsigned char _binary_##NAME##_start[];                         \
+  extern const unsigned char _binary_##NAME##_end[];                           \
+  extern const unsigned char _binary_##NAME##_size[];
+/// Provides access to the .data of the linked object.
+#define LDVAR(NAME) _binary_##NAME##_start
+/// Provides access to the length of the .data section of the linked object.
+#define LDLEN(NAME) _binary_##NAME##_size
+
 /// @defgroup header_segment_types Program Header Segment Types
 /// @brief List of numeric defines which identify segment entries types.
 /// @{
@@ -174,53 +185,53 @@ typedef struct elf_rela_t {
 
 /// @brief Fields index of ELF_IDENT.
 enum Elf_Ident {
-  EI_MAG0 = 0, ///< 0x7F
-  EI_MAG1 = 1, ///< 'E'
-  EI_MAG2 = 2, ///< 'L'
-  EI_MAG3 = 3, ///< 'F'
-  EI_CLASS = 4, ///< Architecture (32/64)
-  EI_DATA = 5, ///< Set to either 1 or 2 to signify little or big endianness.
+  EI_MAG0    = 0, ///< 0x7F
+  EI_MAG1    = 1, ///< 'E'
+  EI_MAG2    = 2, ///< 'L'
+  EI_MAG3    = 3, ///< 'F'
+  EI_CLASS   = 4, ///< Architecture (32/64)
+  EI_DATA    = 5, ///< Set to either 1 or 2 to signify little or big endianness.
   EI_VERSION = 6, ///< ELF Version
-  EI_OSABI = 7, ///< OS Specific
+  EI_OSABI   = 7, ///< OS Specific
   EI_ABIVERSION = 8, ///< OS Specific
-  EI_PAD = 9 ///< Padding
+  EI_PAD        = 9  ///< Padding
 };
 
 #define ELFMAG0 0x7F ///< e_ident[EI_MAG0]
-#define ELFMAG1 'E' ///< e_ident[EI_MAG1]
-#define ELFMAG2 'L' ///< e_ident[EI_MAG2]
-#define ELFMAG3 'F' ///< e_ident[EI_MAG3]
+#define ELFMAG1 'E'  ///< e_ident[EI_MAG1]
+#define ELFMAG2 'L'  ///< e_ident[EI_MAG2]
+#define ELFMAG3 'F'  ///< e_ident[EI_MAG3]
 
 #define ELFDATA2LSB 1 ///< Little Endian
-#define ELFCLASS32 1 ///< 32-bit Architecture
+#define ELFCLASS32  1 ///< 32-bit Architecture
 
 /// @brief Type of ELF files.
 typedef enum Elf_Type {
   ET_NONE = 0, ///< Unkown Type
-  ET_REL = 1, ///< Relocatable File
-  ET_EXEC = 2 ///< Executable File
+  ET_REL  = 1, ///< Relocatable File
+  ET_EXEC = 2  ///< Executable File
 } Elf_Type;
 
-#define EM_386 3 ///< x86 Machine Type.
+#define EM_386     3 ///< x86 Machine Type.
 #define EV_CURRENT 1 ///< ELF Current Version.
 
 /// @brief Defines a number of different types of sections, which correspond
 /// to values stored in the field sh_type in the section header
 typedef enum ShT_Types {
-  SHT_NULL = 0, ///< Null section
+  SHT_NULL     = 0, ///< Null section
   SHT_PROGBITS = 1, ///< Program information
-  SHT_SYMTAB = 2, ///< Symbol table
-  SHT_STRTAB = 3, ///< String table
-  SHT_RELA = 4, ///< Relocation (w/ addend)
-  SHT_NOBITS = 8, ///< Not present in file
-  SHT_REL = 9, ///< Relocation (no addend)
+  SHT_SYMTAB   = 2, ///< Symbol table
+  SHT_STRTAB   = 3, ///< String table
+  SHT_RELA     = 4, ///< Relocation (w/ addend)
+  SHT_NOBITS   = 8, ///< Not present in file
+  SHT_REL      = 9, ///< Relocation (no addend)
 } ShT_Types;
 
 /// @brief ShT_Attributes corresponds to the field sh_flags, but are bit
 /// flags rather than stand-alone values.
 enum ShT_Attributes {
   SHF_WRITE = 0x01, ///< Writable section
-  SHF_ALLOC = 0x02 ///< Exists in memory
+  SHF_ALLOC = 0x02  ///< Exists in memory
 };
 
 /// @brief Provide access to teh symbol biding.
@@ -230,16 +241,16 @@ enum ShT_Attributes {
 
 /// @brief Provides possible symbol bindings.
 enum StT_Bindings {
-  STB_LOCAL = 0, ///< Local scope
+  STB_LOCAL  = 0, ///< Local scope
   STB_GLOBAL = 1, ///< Global scope
-  STB_WEAK = 2 ///< Weak, (ie. __attribute__((weak)))
+  STB_WEAK   = 2  ///< Weak, (ie. __attribute__((weak)))
 };
 
 /// @brief Provides a number of possible symbol types.
 enum StT_Types {
   STT_NOTYPE = 0, ///< No type
   STT_OBJECT = 1, ///< Variables, arrays, etc.
-  STT_FUNC = 2 ///< Methods or functions
+  STT_FUNC   = 2  ///< Methods or functions
 };
 
 /// @brief Loads an ELF file into the memory of task.
@@ -248,6 +259,7 @@ enum StT_Types {
 /// @param entry The ELF binary entry.
 /// @return 0 if fails, 1 if succeed.
 int elf_load_file(task_struct *task, vfs_file_t *file, uint32_t *entry);
+int elf_load_exec0(elf_header_t *header, task_struct *task);
 
 /// @brief Checks if the file is a valid ELF.
 /// @param file The file to check.

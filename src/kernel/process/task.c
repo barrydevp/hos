@@ -238,6 +238,90 @@ int tasking_init() {
   return 1;
 }
 
+task_struct *create_task_test(const char *name) {
+  dprintf("Building (%s) process...\n", name);
+  // Allocate the memory for the process.
+  init_proc = __alloc_task(NULL, NULL, name);
+
+  // == INITIALIZE `/proc/video` ============================================
+  // Check that the fd_list is initialized.
+  assert(init_proc->fd_list && "File descriptor list not initialized.");
+  assert((init_proc->max_fd > 3) &&
+         "File descriptor list cannot contain the standard IOs.");
+
+  // // Create STDIN descriptor.
+  // vfs_file_t *stdin = vfs_open("/proc/video", O_RDONLY, 0);
+  // stdin->count++;
+  // init_proc->fd_list[STDIN_FILENO].file_struct = stdin;
+  // init_proc->fd_list[STDIN_FILENO].flags_mask  = O_RDONLY;
+  // dprintf("`/proc/video` stdin  : %p\n", stdin);
+
+  // // Create STDOUT descriptor.
+  // vfs_file_t *stdout = vfs_open("/proc/video", O_WRONLY, 0);
+  // stdout->count++;
+  // init_proc->fd_list[STDOUT_FILENO].file_struct = stdout;
+  // init_proc->fd_list[STDOUT_FILENO].flags_mask  = O_WRONLY;
+  // dprintf("`/proc/video` stdout : %p\n", stdout);
+
+  // // Create STDERR descriptor.
+  // vfs_file_t *stderr = vfs_open("/proc/video", O_WRONLY, 0);
+  // stderr->count++;
+  // init_proc->fd_list[STDERR_FILENO].file_struct = stderr;
+  // init_proc->fd_list[STDERR_FILENO].flags_mask  = O_WRONLY;
+  // dprintf("`/proc/video` stderr : %p\n", stderr);
+  // ------------------------------------------------------------------------
+
+  // == INITIALIZE TASK MEMORY ==============================================
+  // Load the executable.
+  EXTLD(base_bin_hello)
+  elf_header_t *elf_hdr = (elf_header_t *)LDVAR(base_bin_hello);
+  if (!__reset_process(init_proc) && !(elf_load_exec0(elf_hdr, init_proc))) {
+    dprintf("Entry for init: %d\n", init_proc->thread.regs.eip);
+    kernel_panic("Init not valid (%d)!");
+  }
+  init_proc->thread.regs.eip = elf_hdr->entry;
+  // ------------------------------------------------------------------------
+
+  // == INITIALIZE PROGRAM ARGUMENTS ========================================
+  // Save the current page directory.
+  page_directory_t *cur_pdir = vmm_get_directory();
+  // Switch to init page directory.
+  vmm_switch_directory(init_proc->mm->pgd);
+
+  // Prepare argv and envp for the init process.
+  char **argv_ptr, **envp_ptr;
+  int argc            = 1;
+  static char *argv[] = { "base/bin/hello", (char *)NULL };
+  static char *envp[] = { (char *)NULL };
+  // Save where the arguments start.
+  init_proc->mm->arg_start = init_proc->thread.regs.useresp;
+  // Push the arguments on the stack.
+  argv_ptr = __push_args_on_stack(&init_proc->thread.regs.useresp, argv);
+  // Save where the arguments end.
+  init_proc->mm->arg_end = init_proc->thread.regs.useresp;
+  // Save where the environmental variables start.
+  init_proc->mm->env_start = init_proc->thread.regs.useresp;
+  // Push the environment on the stack.
+  envp_ptr = __push_args_on_stack(&init_proc->thread.regs.useresp, envp);
+  // Save where the environmental variables end.
+  init_proc->mm->env_end = init_proc->thread.regs.useresp;
+  // Push the `main` arguments on the stack (argc, argv, envp).
+  PUSH_VALUE_ON_STACK(init_proc->thread.regs.useresp, envp_ptr);
+  PUSH_VALUE_ON_STACK(init_proc->thread.regs.useresp, argv_ptr);
+  PUSH_VALUE_ON_STACK(init_proc->thread.regs.useresp, argc);
+
+  // Restore previous pgdir
+  vmm_switch_directory(cur_pdir);
+  // ------------------------------------------------------------------------
+
+  // Active the current process.
+  scheduler_enqueue_task(init_proc);
+
+  dprintf("Executing '%s' (pid: %d)...\n", init_proc->name, init_proc->pid);
+
+  return init_proc;
+}
+
 task_struct *process_create_init(const char *path) {
   dprintf("Building init process...\n");
   // Allocate the memory for the process.

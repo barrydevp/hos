@@ -1,5 +1,7 @@
 #include <kernel/memory/mmu.h>
 #include <kernel/memory/vmm.h>
+#include <kernel/process/task.h>
+#include <kernel/process/scheduler.h>
 #include <kernel/assert.h>
 #include <kernel/string.h>
 #include <kernel/printf.h>
@@ -74,8 +76,7 @@ static inline void block_remove_from_freelist(block_t *block,
     *freelist = (uint32_t)block->nextfree;
   } else {
     block_t *prev = first_free_block;
-    while (prev != NULL && prev->nextfree != block)
-      prev = prev->nextfree;
+    while (prev != NULL && prev->nextfree != block) prev = prev->nextfree;
 
     if (prev) {
       prev->nextfree = block->nextfree;
@@ -90,8 +91,8 @@ static inline void block_add_to_freelist(block_t *block, uint32_t *freelist) {
   assert(block && "Received null block.");
   assert(freelist && "Freelist is a null pointer.");
   block_t *first_free_block = (block_t *)*freelist;
-  block->nextfree = first_free_block;
-  *freelist = (uint32_t)block;
+  block->nextfree           = first_free_block;
+  *freelist                 = (uint32_t)block;
 }
 
 /// @brief Find the best fitting block in the memory pool.
@@ -105,7 +106,7 @@ static inline block_t *block_find_best_fitting(uint32_t size,
   }
   block_t *best_fitting = NULL;
   for (block_t *current = first_free_block; current;
-       current = current->nextfree) {
+       current          = current->nextfree) {
     if (!block_is_fit(current, size)) {
       continue;
     }
@@ -131,9 +132,7 @@ static inline block_t *block_get_previous_block(block_t *block,
   block_t *prev = head_block;
 
   // FIXME: Sometimes enters infinite loop!
-  while (prev->next != block) {
-    prev = prev->next;
-  }
+  while (prev->next != block) { prev = prev->next; }
 
   return prev;
 }
@@ -157,30 +156,30 @@ static inline block_t *block_get_next_block(block_t *block, uint32_t *tail) {
 /// @return The heap structure if heap exists, otherwise NULL.
 static vm_area_struct_t *__find_user_heap() {
   // Get the memory descriptor of the current process.
-  // task_struct *current_task = scheduler_get_current_process();
-  // if (current_task == NULL) {
-  //   pr_emerg("There is no current task!\n");
-  //   return NULL;
-  // }
-  // mm_struct_t *current_mm = current_task->mm;
-  // if (current_mm == NULL) {
-  //   pr_emerg("The mm_struct of the current task is not initialized!\n");
-  //   return NULL;
-  // }
-  // // Get the starting address of the heap.
-  // uint32_t start_heap = current_mm->start_brk;
-  // // If not set return NULL.
-  // if (start_heap == 0) {
-  //   return NULL;
-  // }
-  // // Otherwise find the respective heap segment.
-  // vm_area_struct_t *segment = NULL;
-  // list_for_each_decl(it, &current_mm->mmap_list) {
-  //   segment = list_entry(it, vm_area_struct_t, vm_list);
-  //   if (segment->vm_start == start_heap) {
-  //     return segment;
-  //   }
-  // }
+  task_struct *current_task = scheduler_get_current_process();
+  if (current_task == NULL) {
+    dprintf("There is no current task!\n");
+    return NULL;
+  }
+  mm_struct_t *current_mm = current_task->mm;
+  if (current_mm == NULL) {
+    dprintf("The mm_struct of the current task is not initialized!\n");
+    return NULL;
+  }
+  // Get the starting address of the heap.
+  uint32_t start_heap = current_mm->start_brk;
+  // If not set return NULL.
+  if (start_heap == 0) {
+    return NULL;
+  }
+  // Otherwise find the respective heap segment.
+  vm_area_struct_t *segment = NULL;
+  list_for_each_decl(it, &current_mm->mmap_list) {
+    segment = list_entry(it, vm_area_struct_t, vm_list);
+    if (segment->vm_start == start_heap) {
+      return segment;
+    }
+  }
   return NULL;
 }
 
@@ -193,28 +192,30 @@ static void *__do_brk(uint32_t *heap_top, vm_area_struct_t *heap,
                       int increment) {
   assert(heap_top && "Pointer to the current top of the heap is NULL.");
   assert(heap && "Pointer to the heap is NULL.");
-  dprintf("BRK> %s: heap_start: %p, free space: %d\n",
+  dprintf("BRK> %s: heap_start: 0x%p, heap_top: 0x%p, free space: %d\n",
           (heap == &kernel_heap) ? "KERNEL" : "USER",
-          (uint32_t *)heap->vm_start, heap->vm_end - (uint32_t)heap_top);
+          (uint32_t *)heap->vm_start, (uintptr_t)*heap_top,
+          heap->vm_end - *heap_top);
   if (increment > 0) {
     // Compute the new boundary.
-    uint32_t size = (uint32_t)increment;
-    uint32_t new_boundary = *heap_top + size;
+    uint32_t size         = (uint32_t)increment;
+    uint32_t new_boundary = PAGE_ALIGN(*heap_top + size);
     // If new boundary is smaller or equal to end, simply
     // update the heap_top to the new boundary and return
     // the old heap_top.
 
     if (new_boundary <= heap->vm_end) {
+      uint32_t aligned_size = new_boundary - *heap_top;
+      // Allocate new page for extended heap_top
+      for (uint32_t i_virt = 0; i_virt < aligned_size; i_virt += PAGE_SIZE) {
+        vmm_create_page((uintptr_t)((*heap_top) + i_virt), PML_USER_ACCESS);
+      }
+
       // Save the old top of the heap.
       uint32_t old_heap_top = *heap_top;
       // Overwrite the top of the heap.
       *heap_top = new_boundary;
       // Return the old top of the heap.
-
-      for (uint32_t i_virt = 0; i_virt < size; i_virt += PAGE_SIZE) {
-        vmm_create_page((uint32_t)heap_top + i_virt, PML_USER_ACCESS);
-      }
-
       return (void *)old_heap_top;
     } else {
       dprintf("Out of heap memory.\n");
@@ -243,8 +244,8 @@ static void *__do_malloc(vm_area_struct_t *heap, size_t size) {
   // block_t *freelist = NULL;
 
   // We will use these in writing.
-  uint32_t *head = (uint32_t *)(heap->vm_start);
-  uint32_t *tail = (uint32_t *)(heap->vm_start + sizeof(block_t *));
+  uint32_t *head     = (uint32_t *)(heap->vm_start);
+  uint32_t *tail     = (uint32_t *)(heap->vm_start + sizeof(block_t *));
   uint32_t *freelist = (uint32_t *)(heap->vm_start + 2 * sizeof(block_t *));
   // assert(head && tail && freelist && "Heap block lists point to null.");
 
@@ -289,7 +290,7 @@ static void *__do_malloc(vm_area_struct_t *heap, size_t size) {
       if (block_is_free(stored_next_block)) {
         // Choice b)  merge!
         // Gather info about next block
-        void *nextblock = stored_next_block;
+        void *nextblock      = stored_next_block;
         block_t *n_nextblock = nextblock;
         /* Remove next from list because it no longer exists(just
                  * unlink it)
@@ -298,7 +299,7 @@ static void *__do_malloc(vm_area_struct_t *heap, size_t size) {
 
         // Merge!
         block_t *t = (block_t *)block_ptr;
-        t->size = remaining_size + block_get_real_size(n_nextblock->size);
+        t->size    = remaining_size + block_get_real_size(n_nextblock->size);
         block_set_free(&(t->size), 1);
 
         t->next = block_get_next_block(stored_next_block, tail);
@@ -315,7 +316,7 @@ static void *__do_malloc(vm_area_struct_t *heap, size_t size) {
       } else {
         // Choice a)  seperate!
         block_t *putThisBack = (block_t *)block_ptr;
-        putThisBack->size = remaining_size - OVERHEAD;
+        putThisBack->size    = remaining_size - OVERHEAD;
         block_set_free(&(putThisBack->size), 1);
 
         putThisBack->next = stored_next_block;
@@ -354,9 +355,9 @@ no_split:
       tail_block->next = ret;
     }
 
-    ret->next = NULL;
+    ret->next     = NULL;
     ret->nextfree = NULL;
-    *tail = (uint32_t)ret;
+    *tail         = (uint32_t)ret;
 
     void *save = ret;
 
@@ -464,8 +465,8 @@ static void *__do_realloc(vm_area_struct_t *heap, void *ptr, uint32_t size) {
   // static block_t *freelist = NULL;
 
   // We will use these in writing.
-  uint32_t *head = (uint32_t *)(heap->vm_start);
-  uint32_t *tail = (uint32_t *)(heap->vm_start + sizeof(block_t *));
+  uint32_t *head     = (uint32_t *)(heap->vm_start);
+  uint32_t *tail     = (uint32_t *)(heap->vm_start + sizeof(block_t *));
   uint32_t *freelist = (uint32_t *)(heap->vm_start + 2 * sizeof(block_t *));
   assert(head && tail && freelist && "Heap block lists point to null.");
 
@@ -484,7 +485,7 @@ static void *__do_realloc(vm_area_struct_t *heap, void *ptr, uint32_t size) {
     return NULL;
   }
   uint32_t rounded_size = __ALIGN_UP(size, 16);
-  uint32_t block_size = rounded_size + OVERHEAD;
+  uint32_t block_size   = rounded_size + OVERHEAD;
   block_t *nextBlock;
   block_t *prevBlock;
 
@@ -502,8 +503,8 @@ static void *__do_realloc(vm_area_struct_t *heap, void *ptr, uint32_t size) {
     * data there, and then free the original block.
     */
   block_t *nptr = ptr - sizeof(block_t);
-  nextBlock = block_get_next_block(nptr, tail);
-  prevBlock = block_get_previous_block(nptr, head);
+  nextBlock     = block_get_next_block(nptr, tail);
+  prevBlock     = block_get_previous_block(nptr, head);
   if (nptr->size == size) {
     return ptr;
   }
@@ -632,8 +633,8 @@ static void __do_free(vm_area_struct_t *heap, void *ptr) {
   // static block_t *freelist = NULL;
 
   // We will use these in writing.
-  uint32_t *head = (uint32_t *)(heap->vm_start);
-  uint32_t *tail = (uint32_t *)(heap->vm_start + sizeof(block_t *));
+  uint32_t *head     = (uint32_t *)(heap->vm_start);
+  uint32_t *tail     = (uint32_t *)(heap->vm_start + sizeof(block_t *));
   uint32_t *freelist = (uint32_t *)(heap->vm_start + 2 * sizeof(block_t *));
   assert(head && tail && freelist && "Heap block lists point to null.");
 
@@ -724,13 +725,13 @@ static void __do_free(vm_area_struct_t *heap, void *ptr) {
 // }
 
 void *usbrk(int increment) {
-  // task_struct *current_task = scheduler_get_current_process();
-  // mm_struct_t *task_mm = current_task->mm;
-  // uint32_t *heap_curr = &task_mm->brk;
-  //
-  // vm_area_struct_t *heap_segment = __find_user_heap();
-  //
-  // return __do_brk(heap_curr, heap_segment, increment);
+  task_struct *current_task = scheduler_get_current_process();
+  mm_struct_t *task_mm      = current_task->mm;
+  uint32_t *heap_curr       = &task_mm->brk;
+
+  vm_area_struct_t *heap_segment = __find_user_heap();
+
+  return __do_brk(heap_curr, heap_segment, increment);
 
   return NULL;
 }
@@ -825,9 +826,9 @@ void kheap_dump() {
   }
 
   // pr_debug("HEAP:\n");
-  uint32_t total = 0;
+  uint32_t total          = 0;
   uint32_t total_overhead = 0;
-  block_t *it = head_block;
+  block_t *it             = head_block;
   while (it) {
     dprintf("[%c] %12u (%12u)   from 0x%p to 0x%p\n",
             (block_is_free(it)) ? 'F' : 'A', block_get_real_size(it->size),
@@ -851,7 +852,7 @@ void kheap_dump() {
 void kheap_init(boot_info_t *boot_info) {
   // Kernel_heap_start.
   kernel_heap.vm_start = boot_info->heap_start;
-  kernel_heap.vm_end = boot_info->heap_end;
+  kernel_heap.vm_end   = boot_info->heap_end;
 
   // Kernel_heap_start.
   kernel_heap_top = kernel_heap.vm_start;
@@ -870,9 +871,10 @@ void kheap_init(boot_info_t *boot_info) {
   // static block_t *freelist = NULL;
   uint32_t allocated = 3 * sizeof(block_t *);
   // allocate page and map
-  for (uint32_t i_virt = 0; i_virt < allocated; i_virt += PAGE_SIZE) {
-    vmm_create_page((uint32_t)kernel_heap_top + i_virt, PML_USER_ACCESS);
-  }
+  // for (uint32_t i_virt = 0; i_virt < allocated; i_virt += PAGE_SIZE) {
+  //   vmm_create_page((uint32_t)kernel_heap_top + i_virt, PML_USER_ACCESS);
+  // }
+  vmm_create_page((uint32_t)kernel_heap_top, PML_USER_ACCESS);
   memset((void *)kernel_heap_top, 0, allocated);
-  kernel_heap_top += allocated;
+  kernel_heap_top += PAGE_SIZE;
 }

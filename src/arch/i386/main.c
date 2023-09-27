@@ -123,6 +123,7 @@ int kenter(uint32_t magic, uint32_t addr) {
   pit_init();
   rtc_init();
   timer_init();
+  syscall_init();
 
   // Memory management
   pmm_init(&boot_info);
@@ -133,7 +134,10 @@ int kenter(uint32_t magic, uint32_t addr) {
   video_init(&boot_info);
 
   // kernel init
-  kinit(&boot_info);
+  if (kinit(&boot_info)) {
+    dprintf("Kernel init failed!\n");
+    return 1;
+  }
 
   enable_interrupts();
 
