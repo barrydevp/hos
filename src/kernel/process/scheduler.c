@@ -26,7 +26,7 @@ extern void enter_userspace(uintptr_t location, uintptr_t stack);
 /// The list of processes.
 runqueue_t runqueue;
 
-void scheduler_initialize() {
+void scheduler_init() {
   // Initialize the runqueue list of tasks.
   list_head_init(&runqueue.queue);
   // Reset the current task.
@@ -165,7 +165,7 @@ void scheduler_restore_context(task_struct *process, pt_regs *f) {
   *f = process->thread.regs;
   // TODO: Explain paging switch (ring 0 doesn't need page switching)
   // Switch to process page directory
-  paging_switch_directory_va(process->mm->pgd);
+  vmm_switch_directory(process->mm->pgd);
 }
 
 void scheduler_enter_user_jmp(uintptr_t location, uintptr_t stack) {
@@ -297,7 +297,7 @@ pid_t sys_setsid() {
     return -EPERM;
   }
 
-  task->sid = task->pid;
+  task->sid  = task->pid;
   task->pgid = task->pid;
 
   return task->sid;
@@ -520,15 +520,15 @@ int sys_sched_setparam(pid_t pid, const sched_param_t *param) {
       else if (entry->se.is_periodic && !param->is_periodic)
         runqueue.num_periodic--;
       // Sets the parameters from param to the "se" struct parameters.
-      entry->se.prio = param->sched_priority;
-      entry->se.period = param->period;
+      entry->se.prio        = param->sched_priority;
+      entry->se.period      = param->period;
       entry->se.arrivaltime = param->arrivaltime;
       entry->se.is_periodic = param->is_periodic;
-      entry->se.deadline = timer_get_ticks() + param->deadline;
+      entry->se.deadline    = timer_get_ticks() + param->deadline;
       entry->se.next_period = timer_get_ticks();
 
       entry->se.is_under_analysis = true;
-      entry->se.executed = false;
+      entry->se.executed          = false;
       return 1;
     }
   }
@@ -543,9 +543,9 @@ int sys_sched_getparam(pid_t pid, sched_param_t *param) {
     if (entry->pid == pid) {
       //Sets the parameters from the "se" struct to param
       param->sched_priority = entry->se.prio;
-      param->period = entry->se.period;
-      param->deadline = entry->se.deadline;
-      param->arrivaltime = entry->se.arrivaltime;
+      param->period         = entry->se.period;
+      param->deadline       = entry->se.deadline;
+      param->arrivaltime    = entry->se.arrivaltime;
       return 1;
     }
   }
@@ -681,7 +681,7 @@ int sys_waitperiod() {
     // deadline is not been updated by the scheduling algorithm of periodic
     // tasks. We need to update it manually.
     current->se.next_period = current_time;
-    current->se.deadline = current_time + current->se.period;
+    current->se.deadline    = current_time + current->se.period;
   }
   // If the current time is ahead of the deadline, we need to print a warning.
   if (current_time > current->se.deadline) {

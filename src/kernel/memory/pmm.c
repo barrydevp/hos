@@ -1,3 +1,4 @@
+#include <kernel/boot.h>
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/vmm.h>
 #include <kernel/arch.h>
@@ -5,12 +6,12 @@
 
 #include <kernel/printf.h>
 
-static uint32_t memsize = 0;
+static uint32_t memsize                 = 0;
 static volatile uint32_t *frames_bitmap = NULL;
-static uint32_t max_frames = 0;
-static uint32_t used_frames = 0;
-static uint32_t frames_bitmap_size = 0;
-static uint32_t lowest_available = 0;
+static uint32_t max_frames              = 0;
+static uint32_t used_frames             = 0;
+static uint32_t frames_bitmap_size      = 0;
+static uint32_t lowest_available        = 0;
 
 /**
  * @brief Mark a physical page frame as in use.
@@ -20,7 +21,7 @@ static uint32_t lowest_available = 0;
  * @param frame is the frame number(index) (not Address of the frame!)
  */
 void pmm_frame_set(uint32_t frame) {
-  uint32_t index = FRAME_INDEX(frame);
+  uint32_t index  = FRAME_INDEX(frame);
   uint32_t offset = FRAME_OFFSET(frame);
   frames_bitmap[index] |= ((uint32_t)1 << offset);
   asm("" ::: "memory");
@@ -36,8 +37,8 @@ void pmm_frame_set(uint32_t frame) {
 void pmm_frame_seta(uintptr_t frame_addr) {
   /* If the frame is within bounds... */
   // if (frame_addr < max_frames * FRAME_SIZE) {
-  uint32_t frame = frame_addr >> FRAME_SHIFT;
-  uint32_t index = FRAME_INDEX(frame);
+  uint32_t frame  = frame_addr >> FRAME_SHIFT;
+  uint32_t index  = FRAME_INDEX(frame);
   uint32_t offset = FRAME_OFFSET(frame);
   frames_bitmap[index] |= ((uint32_t)1 << offset);
   asm("" ::: "memory");
@@ -52,7 +53,7 @@ void pmm_frame_seta(uintptr_t frame_addr) {
  * @param frame is the frame number(index) (not Address of the frame!)
  */
 void pmm_frame_unset(uint32_t frame) {
-  uint32_t index = FRAME_INDEX(frame);
+  uint32_t index  = FRAME_INDEX(frame);
   uint32_t offset = FRAME_OFFSET(frame);
   frames_bitmap[index] &= ~((uint32_t)1 << offset);
   asm("" ::: "memory");
@@ -71,8 +72,8 @@ void pmm_frame_unset(uint32_t frame) {
 void pmm_frame_unseta(uintptr_t frame_addr) {
   /* If the frame is within bounds... */
   // if (frame_addr < max_frames * FRAME_SIZE) {
-  uint32_t frame = frame_addr >> FRAME_SHIFT;
-  uint32_t index = FRAME_INDEX(frame);
+  uint32_t frame  = frame_addr >> FRAME_SHIFT;
+  uint32_t index  = FRAME_INDEX(frame);
   uint32_t offset = FRAME_OFFSET(frame);
   frames_bitmap[index] &= ~((uint32_t)1 << offset);
   asm("" ::: "memory");
@@ -89,7 +90,7 @@ void pmm_frame_unseta(uintptr_t frame_addr) {
  * @returns 0 if available, 1 otherwise.
  */
 bool pmm_frame_test(uint32_t frame) {
-  uint32_t index = FRAME_INDEX(frame);
+  uint32_t index  = FRAME_INDEX(frame);
   uint32_t offset = FRAME_OFFSET(frame);
   asm("" ::: "memory");
   return !!(frames_bitmap[index] & ((uint32_t)1 << offset));
@@ -170,7 +171,7 @@ uint32_t pmm_first_nfree_frames(size_t n) {
   // }
 
   // Method 3: barry (me)
-  uint32_t i = 0;
+  uint32_t i   = 0;
   size_t avail = 0;
   while (i < max_frames) {
     if (frames_bitmap[FRAME_INDEX(i)] != (uint32_t)-1) {
@@ -235,9 +236,7 @@ static inline uint32_t __pmm_allocate_frames(size_t n) {
     return 0;
   }
 
-  for (uint32_t i = 0; i < n; ++i) {
-    pmm_mark_frame_used(start_frame + i);
-  }
+  for (uint32_t i = 0; i < n; ++i) { pmm_mark_frame_used(start_frame + i); }
 
   return start_frame;
 }
@@ -265,25 +264,21 @@ void pmm_free_frame(uintptr_t frame_addr) {
 
 void pmm_init_test(uint32_t *frames_list, uint32_t size) {
   frames_bitmap = frames_list;
-  max_frames = size * 32;
+  max_frames    = size * 32;
 }
 
 void pmm_init_region(uintptr_t addr, uint32_t length) {
   uint32_t frame_start = addr / FRAME_SIZE;
-  uint32_t frames = (length & FRAME_MASK) >> FRAME_SHIFT;
+  uint32_t frames      = (length & FRAME_MASK) >> FRAME_SHIFT;
 
-  for (uint32_t i = 0; i < frames; ++i) {
-    pmm_frame_unset(i + frame_start);
-  }
+  for (uint32_t i = 0; i < frames; ++i) { pmm_frame_unset(i + frame_start); }
 }
 
 void pmm_deinit_region(uintptr_t addr, uint32_t length) {
   uint32_t frame_start = addr / FRAME_SIZE;
-  uint32_t frames = (length & FRAME_MASK) >> FRAME_SHIFT;
+  uint32_t frames      = (length & FRAME_MASK) >> FRAME_SHIFT;
 
-  for (uint32_t i = 0; i < frames; ++i) {
-    pmm_frame_set(i + frame_start);
-  }
+  for (uint32_t i = 0; i < frames; ++i) { pmm_frame_set(i + frame_start); }
 }
 
 // void pmm_frame_seta(uint32_t paddr) {
@@ -298,15 +293,23 @@ uint32_t get_total_frames() {
   return max_frames;
 }
 
-void pmm_init(struct boot_info_t *boot_info) {
+void pmm_init(boot_info_t *boot_info) {
   struct multiboot_info *mboot = boot_info->multiboot_header;
   // memsize = (meminfo->mem_lower + meminfo->mem_upper) * 1024;
   struct multiboot_tag_mmap *tag_mmap = mboot->multiboot_mmap;
+  memsize                             = boot_info->highest_address;
 
-  memsize = boot_info->highest_address;
-
-  uint32_t addressable_phy = __ALIGN_UP(boot_info->kernel_phy_end, sizeof(uint32_t));
-  uint32_t addressable = __ALIGN_UP(boot_info->kernel_end, sizeof(uint32_t));
+  // FIXME: We have an unhandled problem here, the multiboot is allocated
+  // from kernel_phy_end, so if we use kernel_phy_end as a start address
+  // for our data, it will overlapped with the multiboot data and will cause
+  // error. => For this situation we have a quick fix by page align the start
+  // address and hope it will not overlapped with the multiboot, in the
+  // future, a stable fix may need to take the multiboot size into account for
+  // kernel_phy_end.
+  uint32_t addressable_phy = PAGE_ALIGN(boot_info->kernel_phy_end);
+  uint32_t addressable     = PAGE_ALIGN(boot_info->kernel_end);
+  // dprintf("mmap: %p, end: %p, addr: %p\n", tag_mmap, boot_info->kernel_phy_end,
+  //         addressable_phy);
 
   /* Setup page allocator frames bitmap */
   max_frames = (memsize >> FRAME_SHIFT) + 1;
@@ -331,6 +334,7 @@ void pmm_init(struct boot_info_t *boot_info) {
   addressable_phy += frames_bitmap_size;
   addressable += frames_bitmap_size;
 
+  dprintf("mmap: %u\n", tag_mmap->size);
   /* Map valid memory into bitmap - memory region initialization */
   multiboot_memory_map_t *mmap = tag_mmap->entries;
 
@@ -352,11 +356,13 @@ void pmm_init(struct boot_info_t *boot_info) {
   // boot region
   pmm_deinit_region(0x0, boot_info->bootloader_phy_end);
   // running-kernel region
-  pmm_deinit_region(boot_info->kernel_phy_start, boot_info->kernel_phy_end);
+  pmm_deinit_region(boot_info->kernel_phy_start, boot_info->kernel_size);
   /* Now mark everything up to addressable_phy as in use */
-  pmm_deinit_region(boot_info->kernel_phy_end, addressable_phy);
+  pmm_deinit_region(boot_info->kernel_phy_end,
+                    addressable_phy - boot_info->kernel_phy_end);
   // video region
-  pmm_deinit_region(boot_info->video_phy_start, boot_info->video_phy_end);
+  pmm_deinit_region(boot_info->video_phy_start,
+                    boot_info->video_phy_end - boot_info->video_phy_start);
 
   /* Count available and used frames */
   for (uint32_t i = 0; i < FRAME_INDEX(max_frames); ++i) {

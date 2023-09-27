@@ -23,7 +23,7 @@ int32_t timer_handler(pt_regs *reg) {
   // Save current process fpu state.
   // switch_fpu();
   // Check if a second has passed.
-  ++ticks;
+  // ++ticks;
   // Update all timers
   run_timer_softirq();
   // Perform the schedule.

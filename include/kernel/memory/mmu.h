@@ -6,14 +6,43 @@
 #define mmu_page_is_user_readable(p) (p->bits.user)
 #define mmu_page_is_user_writable(p) (p->bits.writable)
 
+/// @brief Flags associated with virtual memory areas.
+enum MEMMAP_FLAGS {
+  MM_USER    = 0x1, ///< Area belongs to user.
+  MM_GLOBAL  = 0x2, ///< Area is global.
+  MM_RW      = 0x4, ///< Area has user read/write perm.
+  MM_PRESENT = 0x8, ///< Area is valid.
+  // Kernel flags
+  MM_COW     = 0x10, ///< Area is copy on write.
+  MM_UPDADDR = 0x20, ///< Check?
+};
+
+///
 void mmu_init(boot_info_t *boot_info_t);
+
+///
+void *mmu_map_vaddr(page_directory_t *src_pdir, uintptr_t src_vaddr,
+                    uintptr_t dst_vaddr, size_t size);
+
+///
+void mmu_unmap_vaddr(uintptr_t dst_vaddr, size_t size);
+
+///
 uint32_t mmu_create_vm_area(mm_struct_t *mm, uint32_t virt_start, size_t size,
-                            uint32_t pgflags);
+                            size_t size_alloc, uint32_t pgflags);
+///
 uint32_t mmu_clone_vm_area(mm_struct_t *mm, vm_area_struct_t *area, int cow);
+
+///
 mm_struct_t *mmu_create_blank_process_image(size_t stack_size);
+
+///
 mm_struct_t *mmu_clone_process_image(mm_struct_t *mm);
+
+///
 void mmu_destroy_process_image(mm_struct_t *mm);
 
+///
 void *sbrk(size_t bytes);
 
 /** kheap.c */

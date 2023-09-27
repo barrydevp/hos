@@ -1,540 +1,623 @@
 #include <kernel/string.h>
 #include <kernel/types.h>
+#include <kernel/memory/mmu.h>
+#include <kernel/stdio.h>
+#include <kernel/fcntl.h>
+#include <kernel/ctype.h>
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
-#define BITOP(A, B, OP)                              \
-  ((A)[(size_t)(B) / (8 * sizeof *(A))] OP(size_t) 1 \
-   << ((size_t)(B) % (8 * sizeof *(A))))
-
-unsigned short *memsetw(unsigned short *dest, unsigned short val, int count) {
-  int i = 0;
-  for (; i < count; ++i) {
-    dest[i] = val;
+char *strncpy(char *destination, const char *source, size_t num) {
+  char *start = destination;
+  while (num && (*destination++ = *source++)) { num--; }
+  if (num) {
+    while (--num) { *destination++ = '\0'; }
   }
-  return dest;
+
+  return start;
 }
 
-#if 1
-void *memcpy(void *restrict dest, const void *restrict src, size_t n) {
-  uint64_t *d_64 = dest;
-  const uint64_t *s_64 = src;
-
-  for (; n >= 8; n -= 8) {
-    *d_64++ = *s_64++;
+int strncmp(const char *s1, const char *s2, size_t n) {
+  if (!n)
+    return 0;
+  while ((--n > 0) && (*s1) && (*s2) && (*s1 == *s2)) {
+    s1++;
+    s2++;
   }
 
-  uint32_t *d_32 = (void *)d_64;
-  const uint32_t *s_32 = (const void *)s_64;
-
-  for (; n >= 4; n -= 4) {
-    *d_32++ = *s_32++;
-  }
-
-  uint8_t *d = (void *)d_32;
-  const uint8_t *s = (const void *)s_32;
-
-  for (; n > 0; n--) {
-    *d++ = *s++;
-  }
-
-  return dest;
-}
-#else
-/* FIXME why is there an x86-specific memcpy outside of the arch dir... */
-void *memcpy(void *restrict dest, const void *restrict src, size_t n) {
-  asm volatile("rep movsb" : : "D"(dest), "S"(src), "c"(n) : "flags", "memory");
-  return dest;
-}
-#endif
-
-void *memset(void *dest, int c, size_t n) {
-  size_t i = 0;
-  for (; i < n; ++i) {
-    ((char *)dest)[i] = c;
-  }
-  return dest;
+  return *(unsigned char *)s1 - *(unsigned char *)s2;
 }
 
-void *memmove(void *dest, const void *src, size_t n) {
-  char *d = dest;
-  const char *s = src;
+int stricmp(const char *s1, const char *s2) {
+  while (*s2 != 0 && toupper(*s1) == toupper(*s2)) { s1++, s2++; }
 
-  if (d == s) {
-    return d;
-  }
+  return (toupper(*s1) - toupper(*s2));
+}
 
-  if (s + n <= d || d + n <= s) {
-    return memcpy(d, s, n);
-  }
+int strnicmp(const char *s1, const char *s2, size_t n) {
+  int f, l;
 
-  if (d < s) {
-    if ((uintptr_t)s % sizeof(size_t) == (uintptr_t)d % sizeof(size_t)) {
-      while ((uintptr_t)d % sizeof(size_t)) {
-        if (!n--) {
-          return dest;
-        }
-        *d++ = *s++;
-      }
-      for (; n >= sizeof(size_t);
-           n -= sizeof(size_t), d += sizeof(size_t), s += sizeof(size_t)) {
-        *(size_t *)d = *(size_t *)s;
-      }
+  do {
+    if (((f = (unsigned char)(*(s1++))) >= 'A') && (f <= 'Z')) {
+      f -= 'A' - 'a';
     }
-    for (; n; n--) {
-      *d++ = *s++;
+    if (((l = (unsigned char)(*(s2++))) >= 'A') && (l <= 'Z')) {
+      l -= 'A' - 'a';
     }
-  } else {
-    if ((uintptr_t)s % sizeof(size_t) == (uintptr_t)d % sizeof(size_t)) {
-      while ((uintptr_t)(d + n) % sizeof(size_t)) {
-        if (!n--) {
-          return dest;
-        }
-        d[n] = s[n];
-      }
-      while (n >= sizeof(size_t)) {
-        n -= sizeof(size_t);
-        *(size_t *)(d + n) = *(size_t *)(s + n);
-      }
-    }
-    while (n) {
-      n--;
-      d[n] = s[n];
-    }
-  }
+  } while (--n && f && (f == l));
 
-  return dest;
+  return f - l;
 }
 
-void *memchr(const void *src, int c, size_t n) {
-  const unsigned char *s = src;
-  c = (unsigned char)c;
-  for (; ((uintptr_t)s & (ALIGN - 1)) && n && *s != c; s++, n--)
-    ;
-  if (n && *s != c) {
-    const size_t *w;
-    size_t k = ONES * c;
-    for (w = (const void *)s; n >= sizeof(size_t) && !HASZERO(*w ^ k);
-         w++, n -= sizeof(size_t))
-      ;
-    for (s = (const void *)w; n && *s != c; s++, n--)
-      ;
-  }
-  return n ? (void *)s : 0;
+char *strchr(const char *s, int ch) {
+  while (*s && *s != (char)ch) { s++; }
+  if (*s == (char)ch)
+    return (char *)s;
+  { return NULL; }
 }
 
-void *memrchr(const void *m, int c, size_t n) {
-  const unsigned char *s = m;
-  c = (unsigned char)c;
-  while (n--) {
-    if (s[n] == c) {
-      return (void *)(s + n);
-    }
+char *strrchr(const char *s, int ch) {
+  char *start = (char *)s;
+
+  while (*s++) {}
+
+  while (--s != start && *s != (char)ch) {}
+
+  if (*s == (char)ch) {
+    return (char *)s;
   }
+
+  return NULL;
+}
+
+char *strstr(const char *str1, const char *str2) {
+  char *cp = (char *)str1;
+  char *s1, *s2;
+
+  if (!*str2) {
+    return (char *)str1;
+  }
+
+  while (*cp) {
+    s1 = cp;
+    s2 = (char *)str2;
+
+    while (*s1 && *s2 && !(*s1 - *s2)) { s1++, s2++; }
+    if (!*s2) {
+      return cp;
+    }
+    cp++;
+  }
+
+  return NULL;
+}
+
+size_t strspn(const char *string, const char *control) {
+  const char *str  = string;
+  const char *ctrl = control;
+
+  char map[32];
+  size_t n;
+
+  // Clear out bit map.
+  for (n = 0; n < 32; n++) { map[n] = 0; }
+
+  // Set bits in control map.
+  while (*ctrl) {
+    map[*ctrl >> 3] |= (char)(1 << (*ctrl & 7));
+    ctrl++;
+  }
+
+  // 1st char NOT in control map stops search.
+  if (*str) {
+    n = 0;
+    while (map[*str >> 3] & (1 << (*str & 7))) {
+      n++;
+      str++;
+    }
+
+    return n;
+  }
+
   return 0;
 }
 
-size_t strlen(const char *s) {
-  const char *a = s;
-  const size_t *w;
-  for (; (uintptr_t)s % ALIGN; s++) {
-    if (!*s) {
-      return s - a;
+size_t strcspn(const char *string, const char *control) {
+  const char *str  = string;
+  const char *ctrl = control;
+
+  char map[32];
+  size_t n;
+
+  // Clear out bit map.
+  for (n = 0; n < 32; n++) map[n] = 0;
+
+  // Set bits in control map.
+  while (*ctrl) {
+    map[*ctrl >> 3] |= (char)(1 << (*ctrl & 7));
+    ctrl++;
+  }
+
+  // 1st char in control map stops search.
+  n = 0;
+  map[0] |= 1;
+  while (!(map[*str >> 3] & (1 << (*str & 7)))) {
+    n++;
+    str++;
+  }
+
+  return n;
+}
+
+char *strpbrk(const char *string, const char *control) {
+  const char *str  = string;
+  const char *ctrl = control;
+
+  char map[32];
+  int n;
+
+  // Clear out bit map.
+  for (n = 0; n < 32; n++) map[n] = 0;
+
+  // Set bits in control map.
+  while (*ctrl) {
+    map[*ctrl >> 3] |= (char)(1 << (*ctrl & 7));
+    ctrl++;
+  }
+
+  // 1st char in control map stops search.
+  while (*str) {
+    if (map[*str >> 3] & (1 << (*str & 7))) {
+      return (char *)str;
+    }
+    str++;
+  }
+
+  return NULL;
+}
+
+void *memmove(void *dst, const void *src, size_t n) {
+  void *ret = dst;
+
+  if (dst <= src || (char *)dst >= ((char *)src + n)) {
+    /* Non-overlapping buffers; copy from lower addresses to higher
+         * addresses.
+         */
+    while (n--) {
+      *(char *)dst = *(char *)src;
+      dst          = (char *)dst + 1;
+      src          = (char *)src + 1;
+    }
+  } else {
+    // Overlapping buffers; copy from higher addresses to lower addresses.
+    dst = (char *)dst + n - 1;
+    src = (char *)src + n - 1;
+
+    while (n--) {
+      *(char *)dst = *(char *)src;
+      dst          = (char *)dst - 1;
+      src          = (char *)src - 1;
     }
   }
-  for (w = (const void *)s; !HASZERO(*w); w++)
-    ;
-  for (s = (const void *)w; *s; s++)
-    ;
-  return s - a;
+
+  return ret;
+}
+
+void *memchr(const void *ptr, int ch, size_t n) {
+  while (n && (*(unsigned char *)ptr != (unsigned char)ch)) {
+    ptr = (unsigned char *)ptr + 1;
+    n--;
+  }
+
+  return (n ? (void *)ptr : NULL);
+}
+
+char *strlwr(char *s) {
+  char *p = s;
+
+  while (*p) {
+    *p = (char)tolower(*p);
+    p++;
+  }
+
+  return s;
+}
+
+char *strupr(char *s) {
+  char *p = s;
+
+  while (*p) {
+    *p = (char)toupper(*p);
+    p++;
+  }
+
+  return s;
+}
+
+char *strcat(char *dst, const char *src) {
+  char *cp = dst;
+
+  while (*cp) { cp++; }
+
+  while ((*cp++ = *src++) != '\0') {}
+
+  return dst;
+}
+
+char *strncat(char *s1, const char *s2, size_t n) {
+  char *start = s1;
+
+  while (*s1++) {}
+  s1--;
+
+  while (n--) {
+    if (!(*s1++ = *s2++))
+      return start;
+  }
+
+  *s1 = '\0';
+
+  return start;
+}
+
+char *strrev(char *s) {
+  char *start = s;
+  char *left  = s;
+  char ch;
+
+  while (*s++) {}
+  s -= 2;
+
+  while (left < s) {
+    ch      = *left;
+    *left++ = *s;
+    *s--    = ch;
+  }
+
+  return start;
+}
+
+char *strtok_r(char *str, const char *delim, char **saveptr) {
+  char *s;
+  const char *ctrl = delim;
+
+  char map[32];
+  int n;
+
+  // Clear delim map.
+  for (n = 0; n < 32; n++) { map[n] = 0; }
+
+  // Set bits in delimiter table.
+  do { map[*ctrl >> 3] |= (char)(1 << (*ctrl & 7)); } while (*ctrl++);
+
+  /* Initialize s. If str is NULL, set s to the saved
+     * pointer (i.e., continue breaking tokens out of the str
+     * from the last strtok call).
+     */
+  if (str) {
+    s = str;
+  } else {
+    s = *saveptr;
+  }
+
+  /* Find beginning of token (skip over leading delimiters). Note that
+     * there is no token iff this loop sets s to point to the terminal
+     * null (*s == '\0').
+     */
+  while ((map[*s >> 3] & (1 << (*s & 7))) && *s) { s++; }
+
+  str = s;
+
+  /* Find the end of the token. If it is not the end of the str,
+     * put a null there.
+     */
+  for (; *s; s++) {
+    if (map[*s >> 3] & (1 << (*s & 7))) {
+      *s++ = '\0';
+
+      break;
+    }
+  }
+
+  // Update nexttoken.
+  *saveptr = s;
+
+  // Determine if a token has been found.
+  if (str == (char *)s) {
+    return NULL;
+  } else {
+    return str;
+  }
+}
+
+// Intrinsic functions.
+
+/*
+ * #pragma function(memset)
+ * #pragma function(memcmp)
+ * #pragma function(memcpy)
+ * #pragma function(strcpy)
+ * #pragma function(strlen)
+ * #pragma function(strcat)
+ * #pragma function(strcmp)
+ * #pragma function(strset)
+ */
+
+void *memset(void *ptr, int value, size_t num) {
+  // Truncate c to 8 bits.
+  value = (value & 0xFF);
+
+  char *dst = (char *)ptr;
+
+  // Initialize the rest of the size.
+  while (num--) { *dst++ = (char)value; }
+
+  return ptr;
+}
+
+int memcmp(const void *dst, const void *src, size_t n) {
+  if (!n) {
+    return 0;
+  }
+
+  while (--n && *(char *)dst == *(char *)src) {
+    dst = (char *)dst + 1;
+    src = (char *)src + 1;
+  }
+
+  return *((unsigned char *)dst) - *((unsigned char *)src);
+}
+
+void *memcpy(void *dst, const void *src, size_t num) {
+  char *_dst       = dst;
+  const char *_src = src;
+
+  while (num--) { *_dst++ = *_src++; }
+
+  return dst;
+}
+
+void *memccpy(void *dst, const void *src, int c, size_t n) {
+  while (n && (*((char *)(dst = (char *)dst + 1) - 1) =
+                 *((char *)(src = (char *)src + 1) - 1)) != (char)c) {
+    n--;
+  }
+
+  return n ? dst : NULL;
+}
+
+char *strcpy(char *dst, const char *src) {
+  char *save = dst;
+
+  while ((*dst++ = *src++) != '\0') {}
+
+  return save;
+}
+
+size_t strlen(const char *s) {
+  const char *eos;
+
+  for (eos = s; *eos != 0; ++eos) {}
+
+  long len = eos - s;
+
+  return (len < 0) ? 0 : (size_t)len;
 }
 
 size_t strnlen(const char *s, size_t count) {
   const char *sc;
 
-  for (sc = s; *sc != '\0' && count--; ++sc) {
-  }
+  for (sc = s; *sc != '\0' && count--; ++sc) {}
 
   long len = sc - s;
 
   return (len < 0) ? 0 : (size_t)len;
 }
 
-int strcmp(const char *a, const char *b) {
-  uint32_t i = 0;
-  while (1) {
-    if (a[i] < b[i]) {
-      return -1;
-    } else if (a[i] > b[i]) {
-      return 1;
-    } else {
-      if (a[i] == '\0') {
-        return 0;
+int strcmp(const char *s1, const char *s2) {
+  int ret         = 0;
+  const char *s1t = s1, *s2t = s2;
+
+  for (; !(ret = *s1t - *s2t) && *s2t; ++s1t, ++s2t) {}
+
+  return (ret < 0) ? -1 : (ret > 0) ? 1 : 0;
+}
+
+char *strset(char *s, int c) {
+  char *start = s;
+
+  while (*s) { *s++ = (char)c; }
+
+  return start;
+}
+
+char *strnset(char *s, int c, size_t n) {
+  while (n-- && *s) { *s++ = (char)c; }
+
+  return s;
+}
+
+char *strtok(char *str, const char *delim) {
+  const char *spanp;
+  int c, sc;
+  char *tok;
+  static char *last;
+
+  if (str == NULL && (str = last) == NULL) {
+    return (NULL);
+  }
+
+cont:
+  c = *str++;
+  for (spanp = delim; (sc = *spanp++) != 0;) {
+    if (c == sc) {
+      goto cont;
+    }
+  }
+
+  if (c == 0) {
+    last = NULL;
+
+    return (NULL);
+  }
+  tok = str - 1;
+
+  for (;;) {
+    c     = *str++;
+    spanp = delim;
+    do {
+      if ((sc = *spanp++) == c) {
+        if (c == 0) {
+          str = NULL;
+        } else {
+          str[-1] = 0;
+        }
+        last = str;
+
+        return (tok);
       }
-      ++i;
-    }
+    } while (sc != 0);
   }
 }
 
-size_t strspn(const char *s, const char *c) {
-  const char *a = s;
-  size_t byteset[32 / sizeof(size_t)] = { 0 };
+char *trim(char *str) {
+  size_t len   = 0;
+  char *frontp = str;
+  char *endp   = NULL;
 
-  if (!c[0]) {
-    return 0;
+  if (str == NULL) {
+    return NULL;
   }
-  if (!c[1]) {
-    for (; *s == *c; s++)
-      ;
-    return s - a;
-  }
-
-  for (; *c && BITOP(byteset, *(unsigned char *)c, |=); c++)
-    ;
-  for (; *s && BITOP(byteset, *(unsigned char *)s, &); s++)
-    ;
-
-  return s - a;
-}
-
-char *strchrnul(const char *s, int c) {
-  size_t *w;
-  size_t k;
-
-  c = (unsigned char)c;
-  if (!c) {
-    return (char *)s + strlen(s);
+  if (str[0] == '\0') {
+    return str;
   }
 
-  for (; (uintptr_t)s % ALIGN; s++) {
-    if (!*s || *(unsigned char *)s == c) {
-      return (char *)s;
-    }
+  len  = strlen(str);
+  endp = str + len;
+
+  /* Move the front and back pointers to address the first non-whitespace
+     * characters from each end.
+     */
+  while (isspace((unsigned char)*frontp)) { ++frontp; }
+  if (endp != frontp) {
+    while (isspace((unsigned char)*(--endp)) && endp != frontp) {}
+  }
+  if (str + len - 1 != endp) {
+    *(endp + 1) = '\0';
+  } else if (frontp != str && endp == frontp) {
+    *str = '\0';
+  }
+  /* Shift the string so that it starts at str so that if it's dynamically
+     * allocated, we can still free it on the returned pointer.  Note the reuse
+     * of endp to mean the front of the string buffer now.
+     */
+  endp = str;
+  if (frontp != str) {
+    while (*frontp) { *endp++ = *frontp++; }
+    *endp = '\0';
   }
 
-  k = ONES * c;
-  for (w = (void *)s; !HASZERO(*w) && !HASZERO(*w ^ k); w++)
-    ;
-  for (s = (void *)w; *s && *(unsigned char *)s != c; s++)
-    ;
-  return (char *)s;
+  return str;
 }
 
-char *strchr(const char *s, int c) {
-  char *r = strchrnul(s, c);
-  return *(unsigned char *)r == (unsigned char)c ? r : 0;
+char *strdup(const char *s) {
+  size_t len = strlen(s) + 1;
+  char *new  = kmalloc(len);
+  if (new == NULL)
+    return NULL;
+  new[len] = '\0';
+  return (char *)memcpy(new, s, len);
 }
 
-char *strrchr(const char *s, int c) {
-  return memrchr(s, c, strlen(s) + 1);
+char *strndup(const char *s, size_t n) {
+  size_t len = strnlen(s, n);
+  char *new  = kmalloc(len);
+  if (new == NULL)
+    return NULL;
+  new[len] = '\0';
+  return (char *)memcpy(new, s, len);
 }
 
-char *stpcpy(char *restrict d, const char *restrict s) {
-  size_t *wd;
-  const size_t *ws;
+char *strsep(char **stringp, const char *delim) {
+  char *s;
+  const char *spanp;
+  int c, sc;
+  char *tok;
+  if ((s = *stringp) == NULL) {
+    return (NULL);
+  }
+  for (tok = s;;) {
+    c     = *s++;
+    spanp = delim;
+    do {
+      if ((sc = *spanp++) == c) {
+        if (c == 0) {
+          s = NULL;
+        } else {
+          s[-1] = 0;
+        }
+        *stringp = s;
 
-  if ((uintptr_t)s % ALIGN == (uintptr_t)d % ALIGN) {
-    for (; (uintptr_t)s % ALIGN; s++, d++) {
-      if (!(*d = *s)) {
-        return d;
+        return (tok);
       }
+    } while (sc != 0);
+  }
+}
+
+char *itoa(char *buffer, unsigned int num, unsigned int base) {
+  // int numval;
+  char *p, *pbase;
+
+  p = pbase = buffer;
+
+  if (base == 16) {
+    sprintf(buffer, "%0x", num);
+  } else {
+    if (num == 0) {
+      *p++ = '0';
     }
-    wd = (void *)d;
-    ws = (const void *)s;
-    for (; !HASZERO(*ws); *wd++ = *ws++)
-      ;
-    d = (void *)wd;
-    s = (const void *)ws;
+    while (num != 0) {
+      *p++ = (char)('0' + (num % base));
+      num  = num / base;
+    }
+    *p-- = 0;
+
+    while (p > pbase) {
+      char tmp;
+      tmp    = *p;
+      *p     = *pbase;
+      *pbase = tmp;
+
+      p--;
+      pbase++;
+    }
   }
-
-  for (; (*d = *s); s++, d++)
-    ;
-
-  return d;
+  return buffer;
 }
 
-char *strcpy(char *restrict dest, const char *restrict src) {
-  stpcpy(dest, src);
-  return dest;
+char *replace_char(char *str, char find, char replace) {
+  char *current_pos = strchr(str, find);
+
+  while (current_pos) {
+    *current_pos = replace;
+    current_pos  = strchr(current_pos, find);
+  }
+
+  return str;
 }
 
-// size_t lfind(const char *str, const char accept)
-// {
-// 	return (size_t)strchr(str, accept);
-// }
-//
-// size_t rfind(const char *str, const char accept)
-// {
-// 	return (size_t)strrchr(str, accept);
-// }
-//
-// size_t strcspn(const char *s, const char *c)
-// {
-// 	const char *a = s;
-// 	if (c[0] && c[1]) {
-// 		size_t byteset[32 / sizeof(size_t)] = { 0 };
-// 		for (; *c && BITOP(byteset, *(unsigned char *)c, |=); c++)
-// 			;
-// 		for (; *s && !BITOP(byteset, *(unsigned char *)s, &); s++)
-// 			;
-// 		return s - a;
-// 	}
-// 	return strchrnul(s, *c) - a;
-// }
-//
-// char *strpbrk(const char *s, const char *b)
-// {
-// 	s += strcspn(s, b);
-// 	return *s ? (char *)s : 0;
-// }
-//
-// char *strtok_r(char *str, const char *delim, char **saveptr)
-// {
-// 	char *token;
-// 	if (str == NULL) {
-// 		str = *saveptr;
-// 	}
-// 	str += strspn(str, delim);
-// 	if (*str == '\0') {
-// 		*saveptr = str;
-// 		return NULL;
-// 	}
-// 	token = str;
-// 	str = strpbrk(token, delim);
-// 	if (str == NULL) {
-// 		*saveptr = (char *)lfind(token, '\0');
-// 	} else {
-// 		*str = '\0';
-// 		*saveptr = str + 1;
-// 	}
-// 	return token;
-// }
-//
-// static char *strstr_2b(const unsigned char *h, const unsigned char *n)
-// {
-// 	uint16_t nw = n[0] << 8 | n[1];
-// 	uint16_t hw = h[0] << 8 | h[1];
-// 	for (h++; *h && hw != nw; hw = hw << 8 | *++h)
-// 		;
-// 	return *h ? (char *)h - 1 : 0;
-// }
-//
-// static char *strstr_3b(const unsigned char *h, const unsigned char *n)
-// {
-// 	uint32_t nw = n[0] << 24 | n[1] << 16 | n[2] << 8;
-// 	uint32_t hw = h[0] << 24 | h[1] << 16 | h[2] << 8;
-// 	for (h += 2; *h && hw != nw; hw = (hw | *++h) << 8)
-// 		;
-// 	return *h ? (char *)h - 2 : 0;
-// }
-//
-// static char *strstr_4b(const unsigned char *h, const unsigned char *n)
-// {
-// 	uint32_t nw = n[0] << 24 | n[1] << 16 | n[2] << 8 | n[3];
-// 	uint32_t hw = h[0] << 24 | h[1] << 16 | h[2] << 8 | h[3];
-// 	for (h += 3; *h && hw != nw; hw = hw << 8 | *++h)
-// 		;
-// 	return *h ? (char *)h - 3 : 0;
-// }
-//
-// int memcmp(const void *vl, const void *vr, size_t n)
-// {
-// 	const unsigned char *l = vl;
-// 	const unsigned char *r = vr;
-// 	for (; n && *l == *r; n--, l++, r++)
-// 		;
-// 	return n ? *l - *r : 0;
-// }
-//
-// static char *strstr_twoway(const unsigned char *h, const unsigned char *n)
-// {
-// 	size_t mem;
-// 	size_t mem0;
-// 	size_t byteset[32 / sizeof(size_t)] = { 0 };
-// 	size_t shift[256];
-// 	size_t l;
-//
-// 	/* Computing length of needle and fill shift table */
-// 	for (l = 0; n[l] && h[l]; l++) {
-// 		BITOP(byteset, n[l], |=);
-// 		shift[n[l]] = l + 1;
-// 	}
-//
-// 	if (n[l]) {
-// 		return 0; /* hit the end of h */
-// 	}
-//
-// 	/* Compute maximal suffix */
-// 	size_t ip = -1;
-// 	size_t jp = 0;
-// 	size_t k = 1;
-// 	size_t p = 1;
-// 	while (jp + k < l) {
-// 		if (n[ip + k] == n[jp + k]) {
-// 			if (k == p) {
-// 				jp += p;
-// 				k = 1;
-// 			} else {
-// 				k++;
-// 			}
-// 		} else if (n[ip + k] > n[jp + k]) {
-// 			jp += k;
-// 			k = 1;
-// 			p = jp - ip;
-// 		} else {
-// 			ip = jp++;
-// 			k = p = 1;
-// 		}
-// 	}
-// 	size_t ms = ip;
-// 	size_t p0 = p;
-//
-// 	/* And with the opposite comparison */
-// 	ip = -1;
-// 	jp = 0;
-// 	k = p = 1;
-// 	while (jp + k < l) {
-// 		if (n[ip + k] == n[jp + k]) {
-// 			if (k == p) {
-// 				jp += p;
-// 				k = 1;
-// 			} else {
-// 				k++;
-// 			}
-// 		} else if (n[ip + k] < n[jp + k]) {
-// 			jp += k;
-// 			k = 1;
-// 			p = jp - ip;
-// 		} else {
-// 			ip = jp++;
-// 			k = p = 1;
-// 		}
-// 	}
-// 	if (ip + 1 > ms + 1) {
-// 		ms = ip;
-// 	} else {
-// 		p = p0;
-// 	}
-//
-// 	/* Periodic needle? */
-// 	if (memcmp(n, n + p, ms + 1)) {
-// 		mem0 = 0;
-// 		p = MAX(ms, l - ms - 1) + 1;
-// 	} else {
-// 		mem0 = l - p;
-// 	}
-// 	mem = 0;
-//
-// 	/* Initialize incremental end-of-haystack pointer */
-// 	const unsigned char *z = h;
-//
-// 	/* Search loop */
-// 	for (;;) {
-// 		/* Update incremental end-of-haystack pointer */
-// 		if ((size_t)(z - h) < l) {
-// 			/* Fast estimate for MIN(l,63) */
-// 			size_t grow = l | 63;
-// 			const unsigned char *z2 = memchr(z, 0, grow);
-// 			if (z2) {
-// 				z = z2;
-// 				if ((size_t)(z - h) < l) {
-// 					return 0;
-// 				}
-// 			} else {
-// 				z += grow;
-// 			}
-// 		}
-//
-// 		/* Check last byte first; advance by shift on mismatch */
-// 		if (BITOP(byteset, h[l - 1], &)) {
-// 			k = l - shift[h[l - 1]];
-// 			if (k) {
-// 				if (mem0 && mem && k < p)
-// 					k = l - p;
-// 				h += k;
-// 				mem = 0;
-// 				continue;
-// 			}
-// 		} else {
-// 			h += l;
-// 			mem = 0;
-// 			continue;
-// 		}
-//
-// 		/* Compare right half */
-// 		for (k = MAX(ms + 1, mem); n[k] && n[k] == h[k]; k++)
-// 			;
-// 		if (n[k]) {
-// 			h += k - ms;
-// 			mem = 0;
-// 			continue;
-// 		}
-// 		/* Compare left half */
-// 		for (k = ms + 1; k > mem && n[k - 1] == h[k - 1]; k--)
-// 			;
-// 		if (k <= mem) {
-// 			return (char *)h;
-// 		}
-// 		h += p;
-// 		mem = mem0;
-// 	}
-// }
-//
-// char *strstr(const char *h, const char *n)
-// {
-// 	/* Return immediately on empty needle */
-// 	if (!n[0]) {
-// 		return (char *)h;
-// 	}
-//
-// 	/* Use faster algorithms for short needles */
-// 	h = strchr(h, *n);
-// 	if (!h || !n[1]) {
-// 		return (char *)h;
-// 	}
-//
-// 	if (!h[1])
-// 		return 0;
-// 	if (!n[2])
-// 		return strstr_2b((void *)h, (void *)n);
-// 	if (!h[2])
-// 		return 0;
-// 	if (!n[3])
-// 		return strstr_3b((void *)h, (void *)n);
-// 	if (!h[3])
-// 		return 0;
-// 	if (!n[4])
-// 		return strstr_4b((void *)h, (void *)n);
-//
-// 	/* Two-way on large needles */
-// 	return strstr_twoway((void *)h, (void *)n);
-// }
-//
-// uint8_t startswith(const char *str, const char *accept)
-// {
-// 	return strstr(str, accept) == str;
-// }
-
-// char *strdup(const char *c)
-// {
-// 	char *out = malloc(strlen(c) + 1);
-// 	memcpy(out, c, strlen(c) + 1);
-// 	return out;
-// }
-
-int atoi(const char *c) {
-  int sign = 1;
-  long out = 0;
-  if (*c == '-') {
-    sign = '-';
-    c++;
-  }
-
-  while (*c) {
-    out *= 10;
-    out += (*c - '0');
-    c++;
-  }
-
-  return out * sign;
+void strmode(mode_t mode, char *p) {
+  // Usr.
+  *p++ = mode & S_IRUSR ? 'r' : '-';
+  *p++ = mode & S_IWUSR ? 'w' : '-';
+  *p++ = mode & S_IXUSR ? 'x' : '-';
+  // Group.
+  *p++ = mode & S_IRGRP ? 'r' : '-';
+  *p++ = mode & S_IWGRP ? 'w' : '-';
+  *p++ = mode & S_IXGRP ? 'x' : '-';
+  // Other.
+  *p++ = mode & S_IROTH ? 'r' : '-';
+  *p++ = mode & S_IWOTH ? 'w' : '-';
+  *p++ = mode & S_IXOTH ? 'x' : '-';
+  // Will be a '+' if ACL's implemented.
+  *p++ = ' ';
+  *p   = '\0';
 }

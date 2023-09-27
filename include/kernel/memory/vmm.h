@@ -135,7 +135,7 @@ typedef struct vm_area_struct_t {
   /// Permissions.
   pgprot_t vm_page_prot;
   /// Flags.
-  unsigned short vm_flags;
+  uint32_t vm_flags;
   /// rbtree node.
   // struct rb_node vm_rb;
 } vm_area_struct_t;
@@ -183,16 +183,19 @@ typedef struct mm_struct_t {
 void vmm_page_allocate(union PML *page, uint32_t flags);
 void vmm_page_map_addr(union PML *page, uint32_t flags, uintptr_t physAddr);
 
+void vmm_pde_allocate(union PML *pde, uint32_t flags);
+
 union PML *vmm_create_page(uintptr_t virtAddr, uint32_t flags);
 union PML *vmm_get_page(uintptr_t virtAddr);
 union PML *vmm_map_page(uintptr_t virtAddr, uintptr_t physAddr, uint32_t flags);
+void vmm_unmap_page(uintptr_t virtAddr);
 uintptr_t vmm_r_get_phy_addr(uintptr_t virtAddr);
 
-void vmm_map_area(uintptr_t virtAddr, uintptr_t physAddr, uint32_t size,
+void vmm_map_range(uintptr_t virtAddr, uintptr_t physAddr, uint32_t size,
                   uint32_t flags);
-void vmm_unmap_area(uintptr_t virtAddr, uint32_t size);
-void vmm_allocate_area(uintptr_t virtAddr, uint32_t size, uint32_t flags);
-void vmm_deallocate_area(uintptr_t virtAddr, uint32_t size);
+void vmm_unmap_range(uintptr_t virtAddr, uint32_t size);
+void vmm_allocate_range(uintptr_t virtAddr, uint32_t size, uint32_t flags);
+void vmm_deallocate_range(uintptr_t virtAddr, uint32_t size);
 
 page_directory_t *vmm_get_kernel_directory(void);
 page_directory_t *vmm_get_directory(void);

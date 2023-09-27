@@ -1,4 +1,4 @@
-#include <kernel/lib/list.h>
+#include <kernel/list.h>
 #include <kernel/assert.h>
 #include <kernel/string.h>
 #include <kernel/memory/mmu.h>
@@ -49,8 +49,8 @@ listnode_t *list_insert_front(list_t *list, void *value) {
   listnode_t *node = __node_alloc();
 
   list->head->prev = node;
-  node->next = list->head;
-  node->value = value;
+  node->next       = list->head;
+  node->value      = value;
 
   // If it's the first element, then it's both head and tail
   if (!list->head) {
@@ -69,7 +69,7 @@ listnode_t *list_insert_back(list_t *list, void *value) {
 
   // Create a new node.
   listnode_t *node = __node_alloc();
-  node->prev = list->tail;
+  node->prev       = list->tail;
 
   if (list->tail != NULL) {
     list->tail->next = node;
@@ -95,7 +95,7 @@ void *list_remove_node(list_t *list, listnode_t *node) {
     return list_remove_back(list);
   }
 
-  void *value = node->value;
+  void *value      = node->value;
   node->next->prev = node->prev;
   node->prev->next = node->next;
   list->size--;
@@ -112,8 +112,8 @@ void *list_remove_front(list_t *list) {
   }
 
   listnode_t *node = list->head;
-  void *value = node->value;
-  list->head = node->next;
+  void *value      = node->value;
+  list->head       = node->next;
 
   if (list->head) {
     list->head->prev = NULL;
@@ -132,8 +132,8 @@ void *list_remove_back(list_t *list) {
   }
 
   listnode_t *node = list->tail;
-  void *value = node->value;
-  list->tail = node->prev;
+  void *value      = node->value;
+  list->tail       = node->prev;
 
   if (list->tail) {
     list->tail->next = NULL;
@@ -169,7 +169,7 @@ listnode_t *list_pop_back(list_t *list) {
   }
 
   listnode_t *node = list->tail;
-  list->tail = node->prev;
+  list->tail       = node->prev;
 
   if (list->tail) {
     list->tail->next = NULL;
@@ -188,7 +188,7 @@ listnode_t *list_pop_front(list_t *list) {
   }
 
   listnode_t *node = list->head;
-  list->head = list->head->next;
+  list->head       = list->head->next;
   list->size--;
 
   return node;
@@ -271,7 +271,7 @@ void list_destroy(list_t *list) {
   listnode_t *node = list->head;
   while (node != NULL) {
     listnode_t *save = node;
-    node = node->next;
+    node             = node->next;
     __node_dealloc(save);
   }
 

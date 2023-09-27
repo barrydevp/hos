@@ -3,7 +3,7 @@
 #include <kernel/process/scheduler.h>
 #include <kernel/process/task.h>
 #include <kernel/fs/vfs.h>
-// #include "mem/vmem_map.h"
+#include <kernel/memory/mmu.h>
 #include <kernel/string.h>
 #include <kernel/stdio.h>
 #include <kernel/assert.h>
@@ -241,23 +241,36 @@ static inline int elf_load_exec(elf_header_t *header, task_struct *task) {
             to_human_size(program_header->filesz), program_header->vaddr,
             program_header->vaddr + program_header->memsz);
     if (program_header->type == PT_LOAD) {
-      uint32_t virt_addr = create_vm_area(task->mm, program_header->vaddr,
-                                          program_header->memsz,
-                                          MM_USER | MM_RW | MM_COW, GFP_KERNEL);
-      virt_map_page_t *vpage = virt_map_alloc(program_header->memsz);
-      uint32_t dst_addr =
-        virt_map_vaddress(task->mm, vpage, virt_addr, program_header->memsz);
+      // uint32_t virt_addr     = create_vm_area(task->mm, program_header->vaddr, program_header->memsz, MM_USER | MM_RW | MM_COW, GFP_KERNEL);
+      // virt_map_page_t *vpage = virt_map_alloc(program_header->memsz);
+      // uint32_t dst_addr      = virt_map_vaddress(task->mm, vpage, virt_addr, program_header->memsz);
+      //
+      // // Load the memory area.
+      // memcpy((void *)dst_addr, (void *)((uintptr_t)header + program_header->offset), program_header->filesz);
+      //
+      // if (program_header->memsz > program_header->filesz) {
+      //     uint32_t zmem_sz = program_header->memsz - program_header->filesz;
+      //     memset((void *)(dst_addr + program_header->filesz), 0, zmem_sz);
+      // }
+      // virt_unmap_pg(vpage);
+
+      uint32_t virt_addr = mmu_create_vm_area(task->mm, program_header->vaddr,
+                                              program_header->memsz,
+                                              program_header->memsz,
+                                              PML_USER_ACCESS);
+      void *dst_addr     = mmu_map_vaddr(task->mm->pgd, virt_addr, virt_addr,
+                                     program_header->memsz);
 
       // Load the memory area.
       memcpy((void *)dst_addr,
              (void *)((uintptr_t)header + program_header->offset),
              program_header->filesz);
-
       if (program_header->memsz > program_header->filesz) {
         uint32_t zmem_sz = program_header->memsz - program_header->filesz;
         memset((void *)(dst_addr + program_header->filesz), 0, zmem_sz);
       }
-      virt_unmap_pg(vpage);
+
+      mmu_unmap_vaddr(virt_addr, program_header->memsz);
     }
   }
   return true;

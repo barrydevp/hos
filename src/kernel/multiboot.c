@@ -52,7 +52,7 @@ void multiboot_init(uint32_t magic, uint32_t addr) {
       case MULTIBOOT_TAG_TYPE_MMAP: {
         multiboot_memory_map_t *mmap;
 
-        dprintf("mmap\n");
+        dprintf("mmap: %u\n", ((struct multiboot_tag_mmap *)tag)->size);
 
         for (mmap = ((struct multiboot_tag_mmap *)tag)->entries;
              (multiboot_uint8_t *)mmap < (multiboot_uint8_t *)tag + tag->size;
@@ -67,6 +67,7 @@ void multiboot_init(uint32_t magic, uint32_t addr) {
                   (unsigned)(mmap->len & 0xffffffff), (unsigned)mmap->type);
 
         mboot.multiboot_mmap = (struct multiboot_tag_mmap *)tag;
+        dprintf("mmap: %u\n", mboot.multiboot_mmap->size);
       } break;
       case MULTIBOOT_TAG_TYPE_FRAMEBUFFER: {
         printf("framebuffer\n");

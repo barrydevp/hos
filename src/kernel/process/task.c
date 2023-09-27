@@ -11,8 +11,9 @@
 #include <kernel/system/panic.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/assert.h>
-// #include "libgen.h"
+#include <kernel/libgen.h>
 #include <kernel/string.h>
+#include <kernel/bitops.h>
 #include <kernel/errno.h>
 #include <kernel/fcntl.h>
 #include <kernel/printf.h>
@@ -27,8 +28,7 @@ static task_struct *init_proc;
 /// @return the number of arguments.
 static inline int __count_args(char **args) {
   int argc = 0;
-  while (args[argc] != NULL)
-    ++argc;
+  while (args[argc] != NULL) ++argc;
   return argc;
 }
 
@@ -40,9 +40,7 @@ static inline int __count_args_bytes(char **args) {
   int argc = __count_args(args);
   // Count the number of characters.
   int nchar = 0;
-  for (int i = 0; i < argc; i++) {
-    nchar += strlen(args[i]) + 1;
-  }
+  for (int i = 0; i < argc; i++) { nchar += strlen(args[i]) + 1; }
   return nchar + (argc + 1 /* The NULL terminator */) * sizeof(char *);
 }
 
@@ -80,9 +78,9 @@ static int __reset_process(task_struct *task) {
   }
 
   // Save the current page directory.
-  page_directory_t *crtdir = paging_get_current_directory();
+  page_directory_t *cur_pgd = vmm_get_directory();
   // FIXME: Now to clear the stack a pgdir switch is made, it should be a kernel mmapping.
-  paging_switch_directory_va(task->mm->pgd);
+  vmm_switch_directory(task->mm->pgd);
 
   // Clean stack space.
   memset((char *)task->mm->start_stack, 0, DEFAULT_STACK_SIZE);
@@ -95,7 +93,7 @@ static int __reset_process(task_struct *task) {
   task->thread.regs.eflags = task->thread.regs.eflags | EFLAG_IF;
 
   // Restore previous pgdir
-  paging_switch_directory(crtdir);
+  vmm_switch_directory(cur_pgd);
 
   return 1;
 }
@@ -166,24 +164,24 @@ static inline task_struct *__alloc_task(task_struct *source,
   if (source)
     memcpy(&proc->thread, &source->thread, sizeof(thread_struct_t));
   // Set the statistics of the process.
-  proc->uid = 0;
-  proc->gid = 0;
-  proc->sid = 0;
-  proc->pgid = 0;
-  proc->se.prio = DEFAULT_PRIO;
-  proc->se.start_runtime = timer_get_ticks();
-  proc->se.exec_start = timer_get_ticks();
-  proc->se.exec_runtime = 0;
-  proc->se.sum_exec_runtime = 0;
-  proc->se.vruntime = 0;
-  proc->se.period = 0;
-  proc->se.deadline = 0;
-  proc->se.arrivaltime = timer_get_ticks();
-  proc->se.executed = false;
-  proc->se.is_periodic = false;
-  proc->se.is_under_analysis = false;
-  proc->se.next_period = 0;
-  proc->se.worst_case_exec = 0;
+  proc->uid                   = 0;
+  proc->gid                   = 0;
+  proc->sid                   = 0;
+  proc->pgid                  = 0;
+  proc->se.prio               = DEFAULT_PRIO;
+  proc->se.start_runtime      = timer_get_ticks();
+  proc->se.exec_start         = timer_get_ticks();
+  proc->se.exec_runtime       = 0;
+  proc->se.sum_exec_runtime   = 0;
+  proc->se.vruntime           = 0;
+  proc->se.period             = 0;
+  proc->se.deadline           = 0;
+  proc->se.arrivaltime        = timer_get_ticks();
+  proc->se.executed           = false;
+  proc->se.is_periodic        = false;
+  proc->se.is_under_analysis  = false;
+  proc->se.next_period        = 0;
+  proc->se.worst_case_exec    = 0;
   proc->se.utilization_factor = 0;
   // Initialize the exit code of the process.
   proc->exit_code = 0;
@@ -231,10 +229,12 @@ static inline task_struct *__alloc_task(task_struct *source,
   return proc;
 }
 
-int init_tasking() {
-  if ((task_struct_cache = KMEM_CREATE(task_struct)) == NULL) {
-    return 0;
-  }
+int tasking_init() {
+  // if ((task_struct_cache = KMEM_CREATE(task_struct)) == NULL) {
+  //   return 0;
+  // }
+  // return 1;
+
   return 1;
 }
 
@@ -253,21 +253,21 @@ task_struct *process_create_init(const char *path) {
   vfs_file_t *stdin = vfs_open("/proc/video", O_RDONLY, 0);
   stdin->count++;
   init_proc->fd_list[STDIN_FILENO].file_struct = stdin;
-  init_proc->fd_list[STDIN_FILENO].flags_mask = O_RDONLY;
+  init_proc->fd_list[STDIN_FILENO].flags_mask  = O_RDONLY;
   dprintf("`/proc/video` stdin  : %p\n", stdin);
 
   // Create STDOUT descriptor.
   vfs_file_t *stdout = vfs_open("/proc/video", O_WRONLY, 0);
   stdout->count++;
   init_proc->fd_list[STDOUT_FILENO].file_struct = stdout;
-  init_proc->fd_list[STDOUT_FILENO].flags_mask = O_WRONLY;
+  init_proc->fd_list[STDOUT_FILENO].flags_mask  = O_WRONLY;
   dprintf("`/proc/video` stdout : %p\n", stdout);
 
   // Create STDERR descriptor.
   vfs_file_t *stderr = vfs_open("/proc/video", O_WRONLY, 0);
   stderr->count++;
   init_proc->fd_list[STDERR_FILENO].file_struct = stderr;
-  init_proc->fd_list[STDERR_FILENO].flags_mask = O_WRONLY;
+  init_proc->fd_list[STDERR_FILENO].flags_mask  = O_WRONLY;
   dprintf("`/proc/video` stderr : %p\n", stderr);
   // ------------------------------------------------------------------------
 
@@ -281,13 +281,13 @@ task_struct *process_create_init(const char *path) {
 
   // == INITIALIZE PROGRAM ARGUMENTS ========================================
   // Save the current page directory.
-  page_directory_t *crtdir = paging_get_current_directory();
+  page_directory_t *cur_pdir = vmm_get_directory();
   // Switch to init page directory.
-  paging_switch_directory_va(init_proc->mm->pgd);
+  vmm_switch_directory(init_proc->mm->pgd);
 
   // Prepare argv and envp for the init process.
   char **argv_ptr, **envp_ptr;
-  int argc = 1;
+  int argc            = 1;
   static char *argv[] = { "/bin/init", (char *)NULL };
   static char *envp[] = { (char *)NULL };
   // Save where the arguments start.
@@ -308,7 +308,7 @@ task_struct *process_create_init(const char *path) {
   PUSH_VALUE_ON_STACK(init_proc->thread.regs.useresp, argc);
 
   // Restore previous pgdir
-  paging_switch_directory(crtdir);
+  vmm_switch_directory(cur_pdir);
   // ------------------------------------------------------------------------
 
   // Active the current process.
@@ -386,10 +386,10 @@ pid_t sys_fork(pt_regs *f) {
   proc->thread.regs.eflags = proc->thread.regs.eflags | EFLAG_IF;
 
   // Copy session and group id of the parent into the child
-  proc->sid = current->sid;
+  proc->sid  = current->sid;
   proc->pgid = current->pgid;
-  proc->uid = current->uid;
-  proc->gid = current->gid;
+  proc->uid  = current->uid;
+  proc->gid  = current->gid;
 
   // Active the new process.
   scheduler_enqueue_task(proc);
@@ -440,9 +440,9 @@ int sys_execve(pt_regs *f) {
 
   // == COPY PROGRAM ARGUMENTS ==============================================
   // Copy argv and envp to kernel memory, because all the old process memory will be discarded.
-  int argc = __count_args(origin_argv);
+  int argc       = __count_args(origin_argv);
   int argv_bytes = __count_args_bytes(origin_argv);
-  int envc = __count_args(origin_envp);
+  int envc       = __count_args(origin_envp);
   int envp_bytes = __count_args_bytes(origin_envp);
   if ((argv_bytes < 0) || (envp_bytes < 0)) {
     dprintf(
@@ -459,8 +459,8 @@ int sys_execve(pt_regs *f) {
   }
   // Copy the arguments.
   uint32_t args_mem_ptr = (uint32_t)args_mem + (argv_bytes + envp_bytes);
-  saved_argv = __push_args_on_stack(&args_mem_ptr, origin_argv);
-  saved_envp = __push_args_on_stack(&args_mem_ptr, origin_envp);
+  saved_argv            = __push_args_on_stack(&args_mem_ptr, origin_argv);
+  saved_envp            = __push_args_on_stack(&args_mem_ptr, origin_envp);
   // Check the memory pointer.
   assert(args_mem_ptr == (uint32_t)args_mem);
   // ------------------------------------------------------------------------
@@ -476,7 +476,7 @@ int sys_execve(pt_regs *f) {
 
   // == INITIALIZE PROGRAM ARGUMENTS ========================================
   // Save the current page directory.
-  page_directory_t *crtdir = vmm_get_directory();
+  page_directory_t *cur_pgd = vmm_get_directory();
 
   // Change the page directory to point to the newly created process
   vmm_switch_directory(current->mm->pgd);
@@ -497,7 +497,7 @@ int sys_execve(pt_regs *f) {
   PUSH_VALUE_ON_STACK(current->thread.regs.useresp, argc);
 
   // Restore previous pgdir
-  vmm_switch_directory(crtdir);
+  vmm_switch_directory(cur_pgd);
   // ------------------------------------------------------------------------
 
   // Change the name of the process.

@@ -305,7 +305,7 @@ union PML *vmm_map_page(uintptr_t virtAddr, uintptr_t physAddr,
   return (union PML *)&pt->pages[pt_entry];
 }
 
-void vmm_map_area(uintptr_t virtAddr, uintptr_t physAddr, uint32_t size,
+void vmm_map_range(uintptr_t virtAddr, uintptr_t physAddr, uint32_t size,
                   uint32_t flags) {
   for (uint32_t i_virt = 0; i_virt < size; i_virt += PAGE_SIZE) {
     vmm_map_page(virtAddr + i_virt, physAddr + i_virt, flags);
@@ -322,14 +322,16 @@ void vmm_unmap_page(uintptr_t virtAddr) {
 
   /* Setup page table */
   if (!pd->entries[pd_entry].pdbits.present) {
-    return;
+    goto __return;
   }
 
   if (!pt->pages[pt_entry].ptbits.present) {
-    return;
+    goto __return;
   }
 
   pt->pages[pt_entry].raw = 0x0u;
+
+__return:
   vmm_invalidate(virtAddr);
 }
 
@@ -355,7 +357,7 @@ void vmm_free_page(uintptr_t virtAddr) {
   vmm_invalidate(virtAddr);
 }
 
-void vmm_unmap_area(uintptr_t virtAddr, uint32_t size) {
+void vmm_unmap_range(uintptr_t virtAddr, uint32_t size) {
   size = __ALIGN_DOWN(size, PAGE_SIZE);
 
   // unmap page without free frame
@@ -364,13 +366,13 @@ void vmm_unmap_area(uintptr_t virtAddr, uint32_t size) {
   }
 }
 
-void vmm_allocate_area(uintptr_t virtAddr, uint32_t size, uint32_t flags) {
+void vmm_allocate_range(uintptr_t virtAddr, uint32_t size, uint32_t flags) {
   for (uint32_t i_virt = 0; i_virt < size; i_virt += PAGE_SIZE) {
     vmm_create_page(virtAddr + i_virt, flags);
   }
 }
 
-void vmm_deallocate_area(uintptr_t virtAddr, uint32_t size) {
+void vmm_deallocate_range(uintptr_t virtAddr, uint32_t size) {
   size = __ALIGN_DOWN(size, PAGE_SIZE);
 
   // free page and its associated frame
@@ -423,7 +425,7 @@ void vmm_init(struct boot_info_t *boot_info) {
 
   /* Map page for video region */
   uint32_t video_size = (boot_info->video_end - boot_info->video_start);
-  vmm_map_area(boot_info->video_start, boot_info->video_phy_start, video_size,
+  vmm_map_range(boot_info->video_start, boot_info->video_phy_start, video_size,
                PML_USER_ACCESS);
   // for (uint32_t i_virt = 0; i_virt < video_size; i_virt += PAGE_SIZE) {
   //   vmm_map_page(boot_info->video_start + i_virt,

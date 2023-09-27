@@ -142,7 +142,7 @@ extern int *__geterrno();
 #define ENOMEDIUM       123 /* No medium found */
 #define EMEDIUMTYPE     124 /* Wrong medium type */
 #define ENOTSCHEDULABLE 125 ///< The periodc process cannot be scheduled.
-#define ECANCELED       125 /* Operation Canceled */
+// #define ECANCELED       125 /* Operation Canceled */
 #define ENOKEY          126 /* Required key not available */
 #define EKEYEXPIRED     127 /* Key has expired */
 #define EKEYREVOKED     128 /* Key has been revoked */
