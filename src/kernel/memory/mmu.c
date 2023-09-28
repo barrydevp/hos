@@ -6,36 +6,53 @@
 
 static inline void __allocate_vm_area(vm_area_struct_t *area,
                                       size_t size_alloc) {
+  dprintf("__allocate_vm_area(%p)\n", size_alloc);
   page_directory_t *pd = area->vm_mm->pgd;
 
   uintptr_t addr_start = area->vm_start;
-  uintptr_t addr_end   = PAGE_ALIGN(addr_start + size_alloc);
+  uintptr_t addr_end   = addr_start + size_alloc;
 
+  dprintf("__addr: 0x%p - 0x%p - 0x%p\n", addr_start,
+          __ALIGN_UP(addr_end, (PAGE_SIZE << 10)), PAGE_SIZE << 10);
+  dprintf("__pde_o: %u - %u\n", (addr_start >> 22) & ENTRY_MASK,
+          (addr_end >> 22) & ENTRY_MASK);
   uint32_t pfn_start = (addr_start >> PAGE_SHIFT);
-  uint32_t pfn_end   = (addr_end >> PAGE_SHIFT);
+  uint32_t pfn_end   = (__ALIGN_UP(addr_end, PAGE_SIZE) >> PAGE_SHIFT);
   uint32_t pde_start = (pfn_start >> 10) & ENTRY_MASK;
-  uint32_t pde_end   = (pfn_end >> 10) & ENTRY_MASK;
+  uint32_t pde_end =
+    ((__ALIGN_UP(addr_end, (PAGE_SIZE << 10)) >> 22) & ENTRY_MASK);
 
+  dprintf("__pde: %u - %u\n", pde_start, pde_end);
   // Setup page table first
   // * Create if not present
   // * Temporary map to PAGE_TABLE_MAP region
   uint32_t ptable_phy_start = pmm_allocate_frames_addr(pde_end - pde_start);
   for (uint32_t i = pde_start; i < pde_end; ++i) {
-    pd->entries[i].raw = (ptable_phy_start + i) | area->vm_flags;
+    pd->entries[i].raw = (ptable_phy_start + ((i - pde_start) << FRAME_SHIFT)) |
+                         area->vm_flags;
+    dprintf("pdir[%u]: 0x%p, %u, %u\n", i, pd->entries[i].raw,
+            pd->entries[i].pdbits.frame, ptable_phy_start >> FRAME_SHIFT);
   }
-  vmm_map_range(PAGE_TABLE_MAP_START + pde_start, ptable_phy_start,
-                (pde_end - pde_start) << PAGE_SHIFT, PML_KERNEL_ACCESS);
+  vmm_map_range(PAGE_TABLE_MAP_START + (pde_start << PAGE_SHIFT),
+                ptable_phy_start, (pde_end - pde_start) << PAGE_SHIFT,
+                PML_KERNEL_ACCESS);
 
   for (; pfn_start < pfn_end;) {
     uint32_t pde = (pfn_start >> 10) & ENTRY_MASK;
     uint32_t pte = (pfn_start)&ENTRY_MASK;
 
-    page_table_t *pt = (page_table_t *)(PAGE_TABLE_MAP_START + pde);
+    page_table_t *pt =
+      (page_table_t *)(PAGE_TABLE_MAP_START + (pde << PAGE_SHIFT));
 
     for (; pte < 1024 && pfn_start < pfn_end; ++pte, ++pfn_start) {
       if (!pt->pages[pte].ptbits.present) {
         vmm_page_allocate(&pt->pages[pte], area->vm_flags);
         // TODO: zero it
+        dprintf("pages[%u](0x%p): 0x%p -> 0x%p (0x%p -> 0x%p)\n", pte,
+                &pt->pages[pte], pfn_start, pt->pages[pte].raw,
+                pd->entries[pde],
+                vmm_get_directory()
+                  ->entries[PDE_INDEX(PAGE_TABLE_MAP_START + pde * 4)]);
       }
     }
   }
@@ -72,15 +89,21 @@ void *mmu_map_vaddr(page_directory_t *src_pdir, uintptr_t src_vaddr,
   // We should assert cur_pdir must be k_pdir
   page_directory_t *cur_pdir = vmm_get_directory();
 
-  uint32_t src_pde = (src_vaddr >> 20) & ENTRY_MASK;
-  uint32_t dst_pde = (dst_vaddr >> 20) & ENTRY_MASK;
-  uint32_t npde    = (PAGE_ALIGN(size) >> 20) & ENTRY_MASK;
+  uint32_t src_vaddr_end   = src_vaddr + size;
+  uint32_t src_vaddr_start = src_vaddr;
+  uint32_t dst_vaddr_start = src_vaddr;
 
   // This does not invalidate page
-  for (uint32_t i = 0; i < npde; ++i) {
+  for (; src_vaddr_start < src_vaddr_end;) {
     // TODO: Security check, this kernel page will have same flags as src(user)
     // page
-    cur_pdir->entries[dst_pde + i].raw = src_pdir->entries[src_pde + i].raw;
+    uint32_t src_pde = (src_vaddr_start >> 22) & ENTRY_MASK;
+    uint32_t dst_pde = (dst_vaddr_start >> 22) & ENTRY_MASK;
+
+    cur_pdir->entries[src_pde].raw = src_pdir->entries[dst_pde].raw;
+
+    src_vaddr_start += (PAGE_SIZE << 10);
+    dst_vaddr_start += (PAGE_SIZE << 10);
   }
 
   return (void *)dst_vaddr;
@@ -263,13 +286,13 @@ mm_struct_t *mmu_create_blank_process_image(size_t stack_size) {
   mm_struct_t *mm_new = kmalloc(sizeof(mm_struct_t));
   memset(mm_new, 0, sizeof(mm_struct_t));
 
-  list_head_init(&mm_new->mmap_list);
+  // list_head_init(&mm_new->mmap_list);
 
   // TODO: Use this field
   list_head_init(&mm_new->mm_list);
 
   // page_directory_t *pdir_cpy = kmem_cache_alloc(pgdir_cache, GFP_KERNEL);
-  page_directory_t *pdir_cpy = kmalloc(sizeof(page_directory_t));
+  page_directory_t *pdir_cpy = kmalloc_align(sizeof(page_directory_t));
   memcpy(pdir_cpy, vmm_get_kernel_directory(), sizeof(page_directory_t));
   // recursive mapping
   // pdir_cpy->entries[1023].raw =
@@ -346,7 +369,7 @@ mm_struct_t *mmu_clone_process_image(mm_struct_t *mm) {
   // Initialize the process with the main directory, to avoid page tables data races.
   // Pages from the old process are copied/cow when segments are cloned
   // page_directory_t *pdir_cpy = kmem_cache_alloc(pgdir_cache, GFP_KERNEL);
-  page_directory_t *pdir_cpy = kmalloc(sizeof(page_directory_t));
+  page_directory_t *pdir_cpy = kmalloc_align(sizeof(page_directory_t));
   memcpy(pdir_cpy, vmm_get_kernel_directory(), sizeof(page_directory_t));
 
   mm_new->pgd = pdir_cpy;

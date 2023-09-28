@@ -60,7 +60,7 @@ static inline void vmm_page_set_flags(union PML *page, uint32_t flags) {
  * or swapped out, not unallocated page.
  */
 void vmm_page_allocate(union PML *page, uint32_t flags) {
-  if (page->ptbits.frame == 0) {
+  if (page->ptbits.present == 0) {
     uint32_t index     = pmm_allocate_frame();
     page->ptbits.frame = index;
   }
@@ -85,7 +85,7 @@ void vmm_page_map_addr(union PML *page, uint32_t flags, uintptr_t physAddr) {
  * or swapped out, not unallocated page.
  */
 void vmm_pde_allocate(union PML *pde, uint32_t flags) {
-  if (pde->pdbits.frame == 0) {
+  if (pde->pdbits.present == 0) {
     uint32_t index    = pmm_allocate_frame();
     pde->pdbits.frame = index;
   }
@@ -206,7 +206,8 @@ page_directory_t *vmm_clone_pdir(page_directory_t *from) {
  *          an intermediary paging level and @p flags did not have @c MMU_GET_MAKE set.
  */
 union PML *vmm_create_page(uintptr_t virtAddr, uint32_t flags) {
-  virtAddr           = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
+  virtAddr = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
+  dprintf("allocate page: 0x%p\n", virtAddr);
   uintptr_t pageAddr = virtAddr >> PAGE_SHIFT;
   uint32_t pd_entry  = (pageAddr >> 10) & ENTRY_MASK;
   uint32_t pt_entry  = (pageAddr)&ENTRY_MASK;
@@ -231,6 +232,7 @@ union PML *vmm_create_page(uintptr_t virtAddr, uint32_t flags) {
     /* zero it */
     memset((void *)virtAddr, 0, PAGE_SIZE);
   }
+  vmm_page_set_flags(&pt->pages[pt_entry], flags);
 
   return (union PML *)&pt->pages[pt_entry];
 }
@@ -302,19 +304,23 @@ union PML *vmm_map_page(uintptr_t virtAddr, uintptr_t physAddr,
     return NULL;
   }
 
-  if (!pt->pages[pt_entry].ptbits.present) {
-    vmm_page_map_addr(&pt->pages[pt_entry], flags, physAddr);
+  if (pt->pages[pt_entry].ptbits.present) {
+    dprintf("This page is currently in used!\n");
   }
+
+  vmm_page_map_addr(&pt->pages[pt_entry], flags, physAddr);
 
   return (union PML *)&pt->pages[pt_entry];
 }
 
 void vmm_map_range(uintptr_t virtAddr, uintptr_t physAddr, uint32_t size,
                    uint32_t flags) {
+  dprintf("map_range(0x%p, 0x%p, %u)\n", virtAddr, physAddr, size);
   uintptr_t startAddr = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
   uintptr_t endAddr   = __ALIGN_UP(virtAddr + size, PAGE_SIZE);
-  for (; startAddr < endAddr; startAddr += PAGE_SIZE) {
-    vmm_map_page(startAddr, endAddr, flags);
+  physAddr            = __ALIGN_DOWN(physAddr, PAGE_SIZE);
+  for (; startAddr < endAddr; startAddr += PAGE_SIZE, physAddr += PAGE_SIZE) {
+    vmm_map_page(startAddr, physAddr, flags);
   }
 }
 
@@ -410,6 +416,14 @@ void vmm_init(struct boot_info_t *boot_info) {
   k_pdir               = (page_directory_t *)init_page_region[0];
   cur_pdir             = k_pdir;
   uintptr_t k_phy_pdir = __get_cr3();
+  // cur_pdir             = (page_directory_t *)init_page_region[0];
+  // uintptr_t k_phy_pdir = pmm_allocate_frame_addr();
+  // k_pdir               = (page_directory_t *)(k_phy_pdir + KERNEL_HIGHER_HALF);
+  // dprintf("k_phy_pdir: 0x%p\n", k_phy_pdir);
+  // dprintf("k_pdir: 0x%p\n", k_pdir);
+  //
+  // k_pdir->entries[0].raw   = cur_pdir->entries[0].raw;
+  // k_pdir->entries[768].raw = cur_pdir->entries[768].raw;
 
   /** unmap the identity mapping first 4MB */
   // TODO: currently we cannot unmap this because multiboot
@@ -428,7 +442,7 @@ void vmm_init(struct boot_info_t *boot_info) {
   /* Allocate page for pmm used region */
   // FIXME: another approach in future
   uint32_t pmm_used  = PAGE_ALIGN(128 * KB); // for bitmap
-  uint32_t pmm_start = FRAME_ALIGN(boot_info->lowmem_phy_end);
+  uint32_t pmm_start = FRAME_ALIGN(boot_info->kernel_end);
   for (uint32_t i_virt = 0; i_virt < pmm_used; i_virt += PAGE_SIZE) {
     vmm_create_page(pmm_start + i_virt, PML_KERNEL_ACCESS);
   }

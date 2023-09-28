@@ -8,8 +8,14 @@
 
 /// Overhead given by the block_t itself.
 #define OVERHEAD sizeof(block_t)
+/// Align the given address.
+#define ADDR_ALIGN(addr) ((((uint32_t)(addr)) & 0xFFFFF000) + 0x1000)
+/// Checks if the given address is aligned.
+#define IS_ALIGN(addr) ((((uint32_t)(addr)) & 0x00000FFF) == 0)
+/// Returns a rounded up, away from zero, to the nearest multiple of b.
+#define CEIL(NUMBER, BASE) (((NUMBER) + (BASE)-1) & ~((BASE)-1))
 /// User heap initial size ( 1 Megabyte).
-#define UHEAP_INITIAL_SIZE (1 * 1024 * 1024)
+#define UHEAP_INITIAL_SIZE (1 * M)
 
 /// @brief Identifies a block of memory.
 typedef struct block_t {
@@ -117,6 +123,29 @@ static inline block_t *block_find_best_fitting(uint32_t size,
   return best_fitting;
 }
 
+/// @brief Find the best fitting block in the memory pool.
+static inline block_t *block_find_best_fitting_align(uint32_t size,
+                                                     uint32_t *freelist) {
+  assert(freelist && "Freelist is a null pointer.");
+  block_t *first_free_block = (block_t *)*freelist;
+
+  if (first_free_block == NULL) {
+    return NULL;
+  }
+  block_t *best_fitting = NULL;
+  for (block_t *current = first_free_block; current;
+       current          = current->nextfree) {
+    if (!block_is_fit(current, size) && (IS_ALIGN(current + sizeof(block_t)))) {
+      continue;
+    }
+
+    if ((best_fitting == NULL) || (current->size < best_fitting->size)) {
+      best_fitting = current;
+    }
+  }
+  return best_fitting;
+}
+
 /// @brief Given a block, finds its previous block.
 static inline block_t *block_get_previous_block(block_t *block,
                                                 uint32_t *head) {
@@ -199,17 +228,24 @@ static void *__do_brk(uint32_t *heap_top, vm_area_struct_t *heap,
   if (increment > 0) {
     // Compute the new boundary.
     uint32_t size         = (uint32_t)increment;
-    uint32_t new_boundary = PAGE_ALIGN(*heap_top + size);
+    uint32_t new_boundary = *heap_top + size;
     // If new boundary is smaller or equal to end, simply
     // update the heap_top to the new boundary and return
     // the old heap_top.
 
     if (new_boundary <= heap->vm_end) {
-      uint32_t aligned_size = new_boundary - *heap_top;
-      // Allocate new page for extended heap_top
-      for (uint32_t i_virt = 0; i_virt < aligned_size; i_virt += PAGE_SIZE) {
-        vmm_create_page((uintptr_t)((*heap_top) + i_virt), PML_USER_ACCESS);
+      // Allocate new page for the extending of heap_top
+      uintptr_t startAddr = __ALIGN_UP(*heap_top, PAGE_SIZE);
+      uintptr_t endAddr   = __ALIGN_UP(*heap_top + size, PAGE_SIZE);
+      for (; startAddr < endAddr; startAddr += PAGE_SIZE) {
+        dprintf("BRK> Do allocate page: 0x%p\n", startAddr);
+        vmm_create_page(startAddr, heap->vm_flags);
       }
+      // uint32_t aligned_size = new_boundary - *heap_top;
+      // // Allocate new page for extended heap_top
+      // for (uint32_t i_virt = 0; i_virt < aligned_size; i_virt += PAGE_SIZE) {
+      //   vmm_create_page((uintptr_t)((*heap_top) + i_virt), PML_USER_ACCESS);
+      // }
 
       // Save the old top of the heap.
       uint32_t old_heap_top = *heap_top;
@@ -255,7 +291,11 @@ static void *__do_malloc(vm_area_struct_t *heap, size_t size) {
   // block_t *first_free_block = (block_t *) *freelist;
 
   // Calculate real size that's used, round it to multiple of 16.
-  uint32_t rounded_size = __ALIGN_UP(size, 16);
+  // Why 16? 16 = sizeof(block) + 4, which 4 is natural aligned(type int), we align
+  // up to 16 because we want the returned memory to be natural aligned
+  // 16 aligned will be 4 aligned (16 % 4 == 0)
+  // A struct's alignment is determined by its field with the largest alignment requirement.
+  uint32_t rounded_size = CEIL(size, 16);
   // The block size takes into account also the block_t overhead.
   uint32_t block_size = rounded_size + OVERHEAD;
 
@@ -362,8 +402,8 @@ no_split:
     void *save = ret;
 
     /* After sbrk(), split the block into half [block_size  | the rest],
-         * and put the rest into the tree.
-         */
+     * and put the rest into the tree.
+     */
     ret->size = block_size - OVERHEAD;
     block_set_free(&(ret->size), 0);
     // Set the block allocated.
@@ -378,75 +418,149 @@ no_split:
 
 /// @brief Allocates size bytes of uninitialized storage with block align.
 static void *__do_malloc_align(vm_area_struct_t *heap, uint32_t size) {
-  return NULL;
-  // if (size == 0)
-  //   return NULL;
-  //
-  // // Get:
-  // // 1) First memory block.
-  // // static block_t *head = NULL;
-  // // 2) Last memory block.
-  // // static block_t *tail = NULL;
-  // // 3) All the memory blocks that are freed.
-  // // static block_t *freelist = NULL;
-  //
-  // // We will use these in writing.
-  // uint32_t *head = (uint32_t *)(heap->vm_start);
-  // uint32_t *tail = (uint32_t *)(heap->vm_start + sizeof(block_t *));
-  // uint32_t *freelist = (uint32_t *)(heap->vm_start + 2 * sizeof(block_t *));
-  // assert(head && tail && freelist && "Heap block lists point to null.");
-  //
-  // // We will use these others in reading.
-  // block_t *head_block = (block_t *)*head;
-  // block_t *tail_block = (block_t *)*tail;
-  // // block_t *first_free_block = (block_t *) *freelist;
-  //
-  // // Calculate real size that's used, round it to multiple of 16.
-  // uint32_t rounded_size = __ALIGN_UP(size, 16);
-  //
-  // /* Find bestfit in avl tree. This bestfit function will remove
-  //   * thebest-fit node when there is more than one such node in tree.
-  //   */
-  // block_t *best_fitting = block_find_best_fitting(rounded_size, freelist);
-  // if (best_fitting != NULL && (IS_ALIGN(best_fitting + sizeof(block_t)))) {
-  //   return kmalloc(size);
-  // } else {
-  //   void *needed_addr = (void *)ADDR_ALIGN(
-  //     ((uint32_t)kernel_heap_top + sizeof(block_t)) & 0xFFFFF000);
-  //   block_t *block_addr = needed_addr - sizeof(block_t);
-  //
-  //   uint32_t realsize = (uint32_t)block_addr - (uint32_t)(kernel_heap_top) +
-  //                       OVERHEAD + rounded_size;
-  //   block_t *ret;
-  //   if (heap == &kernel_heap) {
-  //     ret = ksbrk(realsize);
-  //   } else {
-  //     ret = usbrk(realsize);
-  //   }
-  //   assert(ret != NULL && "Heap is running out of space\n");
-  //   if (!head_block) {
-  //     *head = (uint32_t)block_addr;
-  //   } else {
-  //     tail_block->next = block_addr;
-  //   }
-  //
-  //   ret->next = NULL;
-  //   ret->nextfree = NULL;
-  //   *tail = (uint32_t)block_addr;
-  //
-  //   /* After sbrk(), split the block into half [block_size  | the rest],
-  //       * and put the rest into the tree.
-  //       */
-  //   block_addr->size = rounded_size;
-  //   block_set_free(&(block_addr->size), 0);
-  //   // Set the block allocated.
-  //   // ptr = ptr + block_size - sizeof(uint32_t);
-  //   // trailing_space = ptr;
-  //   // *trailing_space = block_addr->size;
-  //
-  //   // Now, return it!
-  //   return needed_addr;
-  // }
+  if (size == 0)
+    return NULL;
+
+  // Get:
+  // 1) First memory block.
+  // static block_t *head = NULL;
+  // 2) Last memory block.
+  // static block_t *tail = NULL;
+  // 3) All the memory blocks that are freed.
+  // static block_t *freelist = NULL;
+
+  // We will use these in writing.
+  uint32_t *head     = (uint32_t *)(heap->vm_start);
+  uint32_t *tail     = (uint32_t *)(heap->vm_start + sizeof(block_t *));
+  uint32_t *freelist = (uint32_t *)(heap->vm_start + 2 * sizeof(block_t *));
+  assert(head && tail && freelist && "Heap block lists point to null.");
+
+  // We will use these others in reading.
+  block_t *head_block = (block_t *)*head;
+  block_t *tail_block = (block_t *)*tail;
+  // block_t *first_free_block = (block_t *) *freelist;
+
+  // Calculate real size that's used, round it to multiple of 16.
+  uint32_t rounded_size = CEIL(size, 16);
+  // The block size takes into account also the block_t overhead.
+  uint32_t block_size = rounded_size + OVERHEAD;
+
+  /* Find bestfit in avl tree. This bestfit function will remove
+    * thebest-fit node when there is more than one such node in tree.
+    */
+  block_t *best_fitting = block_find_best_fitting_align(rounded_size, freelist);
+  if (best_fitting != NULL && (IS_ALIGN(best_fitting + sizeof(block_t)))) {
+    // return kmalloc(size);
+    // and! put a SIZE to the last four byte of the chunk
+    char *block_ptr = (void *)best_fitting;
+    // Store a pointer to the next block.
+    void *stored_next_block = block_get_next_block(best_fitting, tail);
+    // Get the size of the chunk.
+    uint32_t chunk_size = block_get_real_size(best_fitting->size) + OVERHEAD;
+    // Get what's left.
+    uint32_t remaining_size = chunk_size - block_size;
+    // Get the real size.
+    uint32_t real_size = (remaining_size < (8 + OVERHEAD)) ? chunk_size :
+                                                             block_size;
+    // Set the size of the best fitting block.
+    best_fitting->size = real_size - OVERHEAD;
+    // Set the content of the block as free.
+    block_set_free(&(best_fitting->size), 0);
+    // Store the base pointer.
+    void *base_ptr = block_ptr;
+
+    block_ptr = (char *)block_ptr + real_size;
+
+    if (remaining_size < (8 + OVERHEAD)) {
+      goto no_split;
+    } else if (remaining_size >= (8 + OVERHEAD)) {
+      if (block_is_free(stored_next_block)) {
+        // Choice b)  merge!
+        // Gather info about next block
+        void *nextblock      = stored_next_block;
+        block_t *n_nextblock = nextblock;
+        /* Remove next from list because it no longer exists(just
+                 * unlink it)
+                 */
+        block_remove_from_freelist(n_nextblock, freelist);
+
+        // Merge!
+        block_t *t = (block_t *)block_ptr;
+        t->size    = remaining_size + block_get_real_size(n_nextblock->size);
+        block_set_free(&(t->size), 1);
+
+        t->next = block_get_next_block(stored_next_block, tail);
+
+        if (nextblock == tail_block) {
+          // I don't want to set it to tail now, instead, reclaim it
+          *tail = (uint32_t)t;
+          // int reclaimSize = block_get_real_size(t->size) + OVERHEAD;
+          // ksbrk(-reclaimSize);
+          // goto no_split;
+        }
+        // then add merged one into the front of the list
+        block_add_to_freelist(t, freelist);
+      } else {
+        // Choice a)  seperate!
+        block_t *putThisBack = (block_t *)block_ptr;
+        putThisBack->size    = remaining_size - OVERHEAD;
+        block_set_free(&(putThisBack->size), 1);
+
+        putThisBack->next = stored_next_block;
+
+        if (base_ptr == tail_block) {
+          *tail = (uint32_t)putThisBack;
+          // int reclaimSize = block_get_real_size(putThisBack->size) +OVERHEAD;
+          // ksbrk(-reclaimSize);
+          // goto no_split;
+        }
+        block_add_to_freelist(putThisBack, freelist);
+      }
+
+      ((block_t *)base_ptr)->next = (block_t *)block_ptr;
+    }
+no_split:
+    // Remove the block from the free list.
+    block_remove_from_freelist(base_ptr, freelist);
+
+    return (char *)base_ptr + sizeof(block_t);
+  } else {
+    void *needed_addr = (void *)ADDR_ALIGN(
+      ((uint32_t)kernel_heap_top + sizeof(block_t)) & 0xFFFFF000);
+    block_t *block_addr = needed_addr - sizeof(block_t);
+
+    uint32_t realsize = (uint32_t)block_addr - (uint32_t)(kernel_heap_top) +
+                        OVERHEAD + rounded_size;
+    block_t *ret;
+    if (heap == &kernel_heap) {
+      ret = ksbrk(realsize);
+    } else {
+      ret = usbrk(realsize);
+    }
+    assert(ret != NULL && "Heap is running out of space\n");
+    if (!head_block) {
+      *head = (uint32_t)block_addr;
+    } else {
+      tail_block->next = block_addr;
+    }
+
+    ret->next     = NULL;
+    ret->nextfree = NULL;
+    *tail         = (uint32_t)block_addr;
+
+    /* After sbrk(), split the block into half [block_size  | the rest],
+    * and put the rest into the tree.
+    */
+    block_addr->size = rounded_size;
+    block_set_free(&(block_addr->size), 0);
+    // Set the block allocated.
+    // ptr = ptr + block_size - sizeof(uint32_t);
+    // trailing_space = ptr;
+    // *trailing_space = block_addr->size;
+
+    // Now, return it!
+    return needed_addr;
+  }
 }
 
 /// @brief       Reallocates the given area of memory. It must be still allocated
@@ -740,12 +854,21 @@ void *ksbrk(int increment) {
   return __do_brk(&kernel_heap_top, &kernel_heap, increment);
 }
 
+inline void *__heap_sbrk(vm_area_struct_t *heap, int increment) {
+  if (heap == &kernel_heap) {
+    return ksbrk(increment);
+  }
+  return usbrk(increment);
+}
+
 void *kmalloc(uint32_t sz) {
+  dprintf("kmalloc(%u) : heap_top: 0x%p\n", sz, kernel_heap_top);
   return __do_malloc(&kernel_heap, sz);
 }
 
 // TODO: check!
 void *kmalloc_align(size_t size) {
+  dprintf("kmalloc_align(%u) : heap_top: 0x%p\n", size, kernel_heap_top);
   return __do_malloc_align(&kernel_heap, size);
 }
 
@@ -850,9 +973,10 @@ void kheap_dump() {
 }
 
 void kheap_init(boot_info_t *boot_info) {
-  // Kernel_heap_start.
+  // Kernel vm_area.
   kernel_heap.vm_start = boot_info->heap_start;
   kernel_heap.vm_end   = boot_info->heap_end;
+  kernel_heap.vm_flags = PML_KERNEL_ACCESS;
 
   // Kernel_heap_start.
   kernel_heap_top = kernel_heap.vm_start;
@@ -874,7 +998,7 @@ void kheap_init(boot_info_t *boot_info) {
   // for (uint32_t i_virt = 0; i_virt < allocated; i_virt += PAGE_SIZE) {
   //   vmm_create_page((uint32_t)kernel_heap_top + i_virt, PML_USER_ACCESS);
   // }
-  vmm_create_page((uint32_t)kernel_heap_top, PML_USER_ACCESS);
+  vmm_create_page((uint32_t)kernel_heap_top, kernel_heap.vm_flags);
   memset((void *)kernel_heap_top, 0, allocated);
-  kernel_heap_top += PAGE_SIZE;
+  kernel_heap_top += allocated;
 }

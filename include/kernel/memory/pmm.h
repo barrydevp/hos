@@ -33,6 +33,7 @@ uint32_t pmm_allocate_frames(size_t n);
 uintptr_t pmm_allocate_frames_addr(size_t n);
 void pmm_free_frame(uintptr_t frame_addr);
 uint32_t get_total_frames();
+uint32_t get_used_frames();
 
 void pmm_init(struct boot_info_t *boot_info);
 

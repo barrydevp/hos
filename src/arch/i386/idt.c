@@ -112,7 +112,9 @@ void idt_init() {
   idt_set_gate(47, irq15, 0x08, 0x8E);
 
   /* Legacy system call entry point, called by userspace. */
+  // 0x60 = I86_IDT_DESC_RING3
   idt_set_gate(127, isr127, 0x08, 0x8E | 0x60);
+  idt_set_gate(128, isr128, 0x08, 0x8E | 0x60);
 
   /** Flush the idtr register */
   idt_load((uint32_t)&idtr);
@@ -377,7 +379,8 @@ static void isr_handler_inner(pt_regs *r) {
     /* Local interrupts that make it here. */
     case 123:
       // return _local_timer(r);
-    case 80:
+    case 127:
+    case 128:
       _syscall_entrypoint(r);
       break;
 

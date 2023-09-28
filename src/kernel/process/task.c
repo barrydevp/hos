@@ -275,7 +275,7 @@ task_struct *create_task_test(const char *name) {
   // Load the executable.
   EXTLD(base_bin_hello)
   elf_header_t *elf_hdr = (elf_header_t *)LDVAR(base_bin_hello);
-  if (!__reset_process(init_proc) && !(elf_load_exec0(elf_hdr, init_proc))) {
+  if (!__reset_process(init_proc) || !(elf_load_exec0(elf_hdr, init_proc))) {
     dprintf("Entry for init: %d\n", init_proc->thread.regs.eip);
     kernel_panic("Init not valid (%d)!");
   }

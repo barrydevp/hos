@@ -235,11 +235,15 @@ static inline int elf_load_exec(elf_header_t *header, task_struct *task) {
     // Get the header.
     elf_program_header_t *program_header = elf_get_program_header(header, i);
     // Dump the information about the header.
-    dprintf(" %-9s | %9s | %9s | 0x%08x - 0x%08x\n",
-            elf_type_to_string(program_header->type),
-            to_human_size(program_header->memsz),
-            to_human_size(program_header->filesz), program_header->vaddr,
+    dprintf("%u, %u, %u, 0x%p - 0x%p\n", program_header->type,
+            program_header->memsz, program_header->filesz,
+            program_header->vaddr,
             program_header->vaddr + program_header->memsz);
+    // dprintf(" %-9s | %9s | %9s | 0x%08x - 0x%08x\n",
+    //         elf_type_to_string(program_header->type),
+    //         to_human_size(program_header->memsz),
+    //         to_human_size(program_header->filesz), program_header->vaddr,
+    //         program_header->vaddr + program_header->memsz);
     if (program_header->type == PT_LOAD) {
       // uint32_t virt_addr     = create_vm_area(task->mm, program_header->vaddr, program_header->memsz, MM_USER | MM_RW | MM_COW, GFP_KERNEL);
       // virt_map_page_t *vpage = virt_map_alloc(program_header->memsz);

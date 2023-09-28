@@ -137,9 +137,9 @@ _en_paging:
 	mov %edi, %cr3
 
 	# Set PSE bit in CR4 to enable 4MB pages
-	mov %cr4, %ecx
-	or $0x00000010, %ecx
-	mov %ecx, %cr4
+	# mov %cr4, %ecx
+	# or $0x00000010, %ecx
+	# mov %ecx, %cr4
 
 	# Enable paging and the write-protect bit.
 	mov %cr0, %ecx

@@ -199,19 +199,24 @@ static inline void pmm_mark_frame_used(uint32_t frame) {
 }
 
 static inline uint32_t __pmm_allocate_frame(void) {
-  // if (max_frames <= used_frames)
-  //   return 0;
+  if (max_frames <= used_frames) {
+    goto __oom;
+  }
 
   uint32_t frame = pmm_first_free_frame();
   if (frame == 0) {
-    dprintf("Out of memory.\n");
-    arch_fatal();
-    return 0;
+    goto __oom;
   }
 
   pmm_mark_frame_used(frame);
 
+  dprintf("__pmm_allocate_frame -> (%u)\n", frame);
+
   return frame;
+__oom:
+  dprintf("Out of memory.\n");
+  arch_fatal();
+  return 0;
 }
 
 uint32_t pmm_allocate_frame(void) {
@@ -226,19 +231,28 @@ uintptr_t pmm_allocate_frame_addr(void) {
 }
 
 static inline uint32_t __pmm_allocate_frames(size_t n) {
-  // if (max_frames - used_frames < n)
-  //   return 0;
+  if (n == 0) {
+    return 0;
+  }
+
+  if (max_frames <= used_frames) {
+    goto __oom;
+  }
 
   uint32_t start_frame = pmm_first_nfree_frames(n);
   if (start_frame == 0) {
-    dprintf("Out of memory.\n");
-    arch_fatal();
-    return 0;
+    goto __oom;
   }
 
   for (uint32_t i = 0; i < n; ++i) { pmm_mark_frame_used(start_frame + i); }
 
+  dprintf("__pmm_allocate_frames -> (%u)\n", start_frame);
+
   return start_frame;
+__oom:
+  dprintf("Out of memory.\n");
+  arch_fatal();
+  return 0;
 }
 
 uint32_t pmm_allocate_frames(size_t n) {
@@ -246,6 +260,7 @@ uint32_t pmm_allocate_frames(size_t n) {
 }
 
 uintptr_t pmm_allocate_frames_addr(size_t n) {
+  dprintf("pmm_allocate_frames_addr(%u)\n", n);
   uint32_t start_frame = __pmm_allocate_frames(n);
 
   uintptr_t addr = start_frame << FRAME_SHIFT;
@@ -291,6 +306,10 @@ void pmm_deinit_region(uintptr_t addr, uint32_t length) {
 
 uint32_t get_total_frames() {
   return max_frames;
+}
+
+uint32_t get_used_frames() {
+  return used_frames;
 }
 
 void pmm_init(boot_info_t *boot_info) {

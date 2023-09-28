@@ -36,15 +36,16 @@ static inline int sys_ni_syscall() {
 }
 
 int call0() {
-  return 0;
-}
-
-int call1() {
   return 65;
 }
 
+int call1(int a) {
+  return a;
+}
+
 int print(char *s) {
-  printf("syscall_print: %s", s);
+  dprintf("syscall_print: %s\n", s);
+  printf("syscall_print: %s\n", s);
 
   return 0;
 }
