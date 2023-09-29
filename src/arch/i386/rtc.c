@@ -122,11 +122,12 @@ int rtc_init() {
   read_register(0x0C);
 
   // Install the IRQ.
-  irq_install_handler(IRQ8, rtc_handler_isr);
+  irq_install_handler(IRQ_REAL_TIME_CLOCK, rtc_handler_isr);
   // Enable the IRQ.
-  pic_clear_mask(IRQ8);
+  pic_clear_mask(IRQ_REAL_TIME_CLOCK);
   // Wait until rtc is ready.
   rtc_update_datetime();
+
   return 0;
 }
 
@@ -134,7 +135,7 @@ int rtc_finalize() {
   // Uninstall the IRQ.
   // irq_uninstall_handler(IRQ8, rtc_handler_isr);
   // Disable the IRQ.
-  pic_clear_mask(IRQ8);
+  pic_set_mask(IRQ_REAL_TIME_CLOCK);
   return 0;
 }
 

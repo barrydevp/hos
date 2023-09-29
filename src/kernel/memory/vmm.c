@@ -206,8 +206,9 @@ page_directory_t *vmm_clone_pdir(page_directory_t *from) {
  *          an intermediary paging level and @p flags did not have @c MMU_GET_MAKE set.
  */
 union PML *vmm_create_page(uintptr_t virtAddr, uint32_t flags) {
-  virtAddr = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
-  dprintf("allocate page: 0x%p\n", virtAddr);
+  dprintf("create_page(0x%p)\n", virtAddr);
+
+  virtAddr           = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
   uintptr_t pageAddr = virtAddr >> PAGE_SHIFT;
   uint32_t pd_entry  = (pageAddr >> 10) & ENTRY_MASK;
   uint32_t pt_entry  = (pageAddr)&ENTRY_MASK;
@@ -284,6 +285,7 @@ _noentry:
 
 union PML *vmm_map_page(uintptr_t virtAddr, uintptr_t physAddr,
                         uint32_t flags) {
+  dprintf("map_page(0x%p, 0x%p)\n", virtAddr, physAddr);
   virtAddr           = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
   uintptr_t pageAddr = virtAddr >> PAGE_SHIFT;
   uint32_t pd_entry  = (pageAddr >> 10) & ENTRY_MASK;
@@ -315,7 +317,6 @@ union PML *vmm_map_page(uintptr_t virtAddr, uintptr_t physAddr,
 
 void vmm_map_range(uintptr_t virtAddr, uintptr_t physAddr, uint32_t size,
                    uint32_t flags) {
-  dprintf("map_range(0x%p, 0x%p, %u)\n", virtAddr, physAddr, size);
   uintptr_t startAddr = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
   uintptr_t endAddr   = __ALIGN_UP(virtAddr + size, PAGE_SIZE);
   physAddr            = __ALIGN_DOWN(physAddr, PAGE_SIZE);
@@ -410,20 +411,11 @@ void vmm_deallocate_range(uintptr_t virtAddr, uint32_t size) {
 
 void vmm_init(struct boot_info_t *boot_info) {
   // initialize page table directory
-  // log("VMM: Initializing");
 
   // allocate page directory
   k_pdir               = (page_directory_t *)init_page_region[0];
   cur_pdir             = k_pdir;
   uintptr_t k_phy_pdir = __get_cr3();
-  // cur_pdir             = (page_directory_t *)init_page_region[0];
-  // uintptr_t k_phy_pdir = pmm_allocate_frame_addr();
-  // k_pdir               = (page_directory_t *)(k_phy_pdir + KERNEL_HIGHER_HALF);
-  // dprintf("k_phy_pdir: 0x%p\n", k_phy_pdir);
-  // dprintf("k_pdir: 0x%p\n", k_pdir);
-  //
-  // k_pdir->entries[0].raw   = cur_pdir->entries[0].raw;
-  // k_pdir->entries[768].raw = cur_pdir->entries[768].raw;
 
   /** unmap the identity mapping first 4MB */
   // TODO: currently we cannot unmap this because multiboot
@@ -435,7 +427,6 @@ void vmm_init(struct boot_info_t *boot_info) {
     vmm_pde_allocate(&k_pdir->entries[i], PML_KERNEL_ACCESS);
   }
 
-  // log("VMM: Setup recursive page directory");
   /* Recursive mapping */
   k_pdir->entries[1023].raw = (k_phy_pdir & PAGE_MASK) | PML_KERNEL_ACCESS;
 
@@ -452,18 +443,7 @@ void vmm_init(struct boot_info_t *boot_info) {
     PAGE_ALIGN(boot_info->video_end - boot_info->video_start);
   vmm_map_range(boot_info->video_start, boot_info->video_phy_start, video_size,
                 PML_USER_ACCESS);
-  // for (uint32_t i_virt = 0; i_virt < video_size; i_virt += PAGE_SIZE) {
-  //   vmm_map_page(boot_info->video_start + i_virt,
-  //                boot_info->video_phy_start + i_virt, PML_USER_ACCESS);
-  // }
 
-  /* Allocate page for kernel heap region */
-  // uint32_t heap_size = (boot_info->heap_end - boot_info->heap_start);
-  // for (uint32_t i_virt = 0; i_virt < heap_size; i_virt += PAGE_SIZE) {
-  //   vmm_create_page(boot_info->heap_start + i_virt, PML_USER_ACCESS);
-  // }
-
+  // swithc to k_pdir, actually this is redundant
   vmm_switch_directory(k_pdir);
-  // vmm_paging(va_dir, pa_dir);
-  // log("VMM: Done");
 }

@@ -210,7 +210,7 @@ static inline uint32_t __pmm_allocate_frame(void) {
 
   pmm_mark_frame_used(frame);
 
-  dprintf("__pmm_allocate_frame -> (%u)\n", frame);
+  // dprintf("__pmm_allocate_frame -> (%u)\n", frame);
 
   return frame;
 __oom:
@@ -246,7 +246,7 @@ static inline uint32_t __pmm_allocate_frames(size_t n) {
 
   for (uint32_t i = 0; i < n; ++i) { pmm_mark_frame_used(start_frame + i); }
 
-  dprintf("__pmm_allocate_frames -> (%u)\n", start_frame);
+  // dprintf("__pmm_allocate_frames -> (%u)\n", start_frame);
 
   return start_frame;
 __oom:
@@ -260,7 +260,7 @@ uint32_t pmm_allocate_frames(size_t n) {
 }
 
 uintptr_t pmm_allocate_frames_addr(size_t n) {
-  dprintf("pmm_allocate_frames_addr(%u)\n", n);
+  // dprintf("pmm_allocate_frames_addr(%u)\n", n);
   uint32_t start_frame = __pmm_allocate_frames(n);
 
   uintptr_t addr = start_frame << FRAME_SHIFT;
@@ -313,9 +313,9 @@ uint32_t get_used_frames() {
 }
 
 void pmm_init(boot_info_t *boot_info) {
-  struct multiboot_info *mboot = boot_info->multiboot_header;
+  struct multiboot_info *mboot_h = boot_info->multiboot_header;
   // memsize = (meminfo->mem_lower + meminfo->mem_upper) * 1024;
-  struct multiboot_tag_mmap *tag_mmap = mboot->multiboot_mmap;
+  struct multiboot_tag_mmap *tag_mmap = mboot_h->multiboot_mmap;
   memsize                             = boot_info->highest_address;
 
   // FIXME: We have an unhandled problem here, the multiboot is allocated
@@ -353,7 +353,7 @@ void pmm_init(boot_info_t *boot_info) {
   addressable_phy += frames_bitmap_size;
   addressable += frames_bitmap_size;
 
-  dprintf("mmap: %u\n", tag_mmap->size);
+  // dprintf("mmap: %u\n", tag_mmap->size);
   /* Map valid memory into bitmap - memory region initialization */
   multiboot_memory_map_t *mmap = tag_mmap->entries;
 

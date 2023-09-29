@@ -37,7 +37,7 @@ void set_keymap_type(keymap_type_t type);
 const keymap_t *get_keymap(int scancode);
 
 /// @brief Initializes the supported keymaps.
-void init_keymaps();
+void keymap_init();
 
 /// @name Keyboard Codes
 /// @brief This is the list of keyboard codes.

@@ -1,9 +1,11 @@
-#include <kernel/string.h>
-#include <kernel/types.h>
 #include <kernel/memory/mmu.h>
 #include <kernel/stdio.h>
+#include <kernel/string.h>
+#include <kernel/types.h>
 #include <kernel/fcntl.h>
 #include <kernel/ctype.h>
+#include <kernel/bitops.h>
+#include <kernel/math.h>
 
 char *strncpy(char *destination, const char *source, size_t num) {
   char *start = destination;
@@ -620,4 +622,42 @@ void strmode(mode_t mode, char *p) {
   // Will be a '+' if ACL's implemented.
   *p++ = ' ';
   *p   = '\0';
+}
+
+const char *to_human_size(unsigned long bytes) {
+  static char output[200];
+  const char *suffix[] = { "B", "KB", "MB", "GB", "TB" };
+  char length          = sizeof(suffix) / sizeof(suffix[0]);
+  int i                = 0;
+  uint32_t integer     = bytes;
+  uint32_t fractional  = 0;
+  if (bytes > 1024) {
+    for (i = 0; (bytes / 1024) > 0 && i < length - 1; i++, bytes /= 1024) {
+      integer    = bytes / 1024;
+      fractional = (bytes % 1024) * 1000 / 1024;
+    }
+  }
+  sprintf(output, "%u.%.03u %2s", integer, fractional, suffix[i]);
+  return output;
+}
+
+// const char *to_human_size(unsigned long bytes) {
+//   static char output[200];
+//   const char *suffix[] = { "B", "KB", "MB", "GB", "TB" };
+//   char length          = sizeof(suffix) / sizeof(suffix[0]);
+//   int i                = 0;
+//   double dblBytes      = bytes;
+//   if (bytes > 1024) {
+//     for (i = 0; (bytes / 1024) > 0 && i < length - 1; i++, bytes /= 1024)
+//       dblBytes = bytes / 1024.0;
+//   }
+//   sprintf(output, "%.03lf %2s", dblBytes, suffix[i]);
+//   return output;
+// }
+
+const char *dec_to_binary(unsigned long value, unsigned length) {
+  static char buffer[33];
+  for (int i = 0, j = 32 - min(max(0, length), 32); j < 32; ++i, ++j)
+    buffer[i] = bit_check(value, 31 - j) ? '1' : '0';
+  return buffer;
 }

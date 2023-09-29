@@ -1,15 +1,16 @@
 #include <kernel/string.h>
-// #include <kernel/types.h>
-// #include <kernel/vfs.h>
+#include <kernel/types.h>
+#include <kernel/fs/vfs.h>
 // #include <kernel/pipe.h>
-// #include <kernel/process.h>
-// #include <kernel/printf.h>
+#include <kernel/process/task.h>
 // #include <kernel/args.h>
 // #include <kernel/pty.h>
 #include <arch/i386/serial.h>
 #include <arch/i386/regs.h>
 #include <arch/i386/ports.h>
 #include <arch/i386/irq.h>
+
+#include <kernel/printf.h>
 
 // static pty_t * _serial_port_pty_a = NULL;
 // static pty_t * _serial_port_pty_b = NULL;

@@ -7,7 +7,7 @@ DECLARE_FIXED_SIZE_RING_BUFFER(int, scancode, 256, -1)
 
 /// @brief The interrupt service routine of the keyboard.
 /// @param f The interrupt stack frame.
-void keyboard_isr(pt_regs *f);
+int32_t keyboard_isr(pt_regs *f);
 
 /// @brief Enable the keyboard.
 void keyboard_enable();

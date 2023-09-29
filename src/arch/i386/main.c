@@ -12,6 +12,7 @@
 #include <kernel/boot.h>
 #include <kernel/multiboot.h>
 #include <kernel/drivers/video.h>
+#include <kernel/drivers/keyboard.h>
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/vmm.h>
 #include <kernel/memory/mmu.h>
@@ -97,20 +98,24 @@ static inline void boot_init(uint32_t magic, uint32_t addr) {
 
   dprintf("Memory summary: \n"
           " total: %uGB + %uMB + %uKB\n"
-          " kernel: phy=0x%p virt=0x%p (%uKB)\n"
+          " kernel: phy=0x%p->0x%p virt=0x%p->0x%p (%uKB)\n"
           " heap: virt=0x%p (%uMB)\n"
           " video: phy=0x%p virt=0x%p type=%u (%uKB)\n",
           highest_address / GB, (highest_address % GB) / MB,
           ((highest_address % GB) % MB) / KB, boot_info.kernel_phy_start,
-          boot_info.kernel_start, boot_info.kernel_size / KB,
+          boot_info.kernel_phy_end, boot_info.kernel_start,
+          boot_info.kernel_end, boot_info.kernel_size / KB,
           boot_info.heap_start, heap_size / MB, boot_info.video_phy_start,
           boot_info.video_start, (unsigned)boot_info.video_type, fb_size / KB);
 }
 
 int kenter(uint32_t magic, uint32_t addr) {
-  // Early init for logging
+  // Early init
   early_log_init();
   video_early_init();
+  // Dhisable the keyboard, otherwise the PS/2 initialization does not
+  // work properly.
+  keyboard_disable();
 
   // Setup boot_info
   boot_init(magic, addr);
@@ -121,24 +126,29 @@ int kenter(uint32_t magic, uint32_t addr) {
   idt_init();
   pic_init();
   pit_init();
-  rtc_init();
-  timer_init();
-  syscall_init();
 
   // Memory management
   pmm_init(&boot_info);
   vmm_init(&boot_info);
   mmu_init(&boot_info);
 
+  // Timing
+  rtc_init();
+  timer_init();
+
+  // System call
+  syscall_init();
+
   // Graphic
   video_init(&boot_info);
 
-  // kernel init
+  // Kernel
   if (kinit(&boot_info)) {
     dprintf("Kernel init failed!\n");
     return 1;
   }
 
+  // Enable interrupts
   enable_interrupts();
 
   /* give control to the real kernel main */

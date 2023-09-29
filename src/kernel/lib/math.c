@@ -1,4 +1,4 @@
-#include <stdint.h>
+#include <kernel/stdint.h>
 #include <kernel/math.h>
 
 double round(double x) {
@@ -144,4 +144,16 @@ double modf(double x, double *intpart) {
   }
   // Signed fractional part.
   return (x - (*intpart));
+}
+
+double fmod(double x, double y) {
+  long double out;
+  asm volatile("1: fprem;"       /* Partial remainder */
+               "   fnstsw %%ax;" /* store status word */
+               "   sahf;"        /* store AX (^ FPU status) into flags */
+               "   jp 1b;"       /* jump back to 1 above if parity flag==1 */
+               : "=t"(out)
+               : "0"(x), "u"(y)
+               : "ax", "cc");
+  return out;
 }

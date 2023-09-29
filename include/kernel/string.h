@@ -309,6 +309,12 @@ void strmode(mode_t mode, char *p);
 /// @return String representing the bytes in human readable form.
 const char *to_human_size(unsigned long bytes);
 
+/// @brief Transforms the given value to a binary string.
+/// @param value to print.
+/// @param length of the binary output.
+/// @return String representing the binary value.
+const char *dec_to_binary(unsigned long value, unsigned length);
+
 // extern char *strtok_r(char *str, const char *delim, char **saveptr);
 //
 // extern void *__attribute__((malloc)) malloc(uintptr_t size);

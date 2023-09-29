@@ -109,6 +109,7 @@ _setup_paging:
 	/* PDT[0] = &PT[0] | (PRESENT, WRITABLE, KERNEL) */
 	// notice flag is 0x3 and remain 0x1000 is offset to the PT[0] pointer
 	// which can be break as: mov 0x03, eax; add 0x1000, eax
+	// first 4MB identity map
 	mov $0x1003, %eax  
 	add %edi, %eax
 	mov %eax, (%edi)
@@ -118,12 +119,25 @@ _setup_paging:
 	add $768 * 4, %edi
 	mov %eax, (%edi)
 
-	/* Setup 4MB indentity mapping(1MB) + multiboot + kernel to PDT[0] */
+	/* PDT[769] = &PT[1] | (PRESENT, WRITABLE, KERNEL) */
+	// Next 4MB
+	add $4, %edi
+	add $0x1000, %eax
+	mov %eax, (%edi)
+
+	/* PDT[769] = &PT[1] | (PRESENT, WRITABLE, KERNEL) */
+	// next 4MB identity map (this will contain the multiboot)
+	sub $768 * 4, %edi
+	mov %eax, (%edi)
+
+	/* Setup 8MB mapping(1MB) + multiboot + kernel to PDT[0] */
 	// FIXME: if the kernel size is largen than 3MB, need more PT
 	// FIXME!: Remeber the size of frams_bitmap for 4GB mem is 
-	add $0x1000 - 768 * 4, %edi
+	// 1 = because last edi is PDT[1] so we add 1023 * 4 to move it
+	// to PT[0]
+	add $0x1000 - 1 * 4, %edi
 	mov $0x0003, %ebx
-	mov $1024, %ecx
+	mov $2048, %ecx
 
 _set_entry:
 	mov %ebx, (%edi)
