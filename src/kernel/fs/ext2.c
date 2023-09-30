@@ -22,22 +22,25 @@
 // ============================================================================
 
 /// Filesystem general operations.
-static vfs_sys_operations_t ext2_sys_operations = { .mkdir_f = ext2_mkdir,
-                                                    .rmdir_f = ext2_rmdir,
-                                                    .stat_f  = ext2_stat,
-                                                    .creat_f = ext2_creat };
+static struct vfs_sys_operations_t ext2_sys_operations = {
+  .mkdir_f = ext2_mkdir,
+  .rmdir_f = ext2_rmdir,
+  .stat_f  = ext2_stat,
+  .creat_f = ext2_creat
+};
 
 /// Filesystem file operations.
-static vfs_file_operations_t ext2_fs_operations = { .open_f   = ext2_open,
-                                                    .unlink_f = ext2_unlink,
-                                                    .close_f  = ext2_close,
-                                                    .read_f   = ext2_read,
-                                                    .write_f  = ext2_write,
-                                                    .lseek_f  = ext2_lseek,
-                                                    .stat_f   = ext2_fstat,
-                                                    .ioctl_f  = ext2_ioctl,
-                                                    .getdents_f =
-                                                      ext2_getdents };
+static struct vfs_file_operations_t ext2_fs_operations = {
+  .open_f     = ext2_open,
+  .unlink_f   = ext2_unlink,
+  .close_f    = ext2_close,
+  .read_f     = ext2_read,
+  .write_f    = ext2_write,
+  .lseek_f    = ext2_lseek,
+  .stat_f     = ext2_fstat,
+  .ioctl_f    = ext2_ioctl,
+  .getdents_f = ext2_getdents
+};
 
 // ============================================================================
 // Debugging Support Functions
@@ -2891,10 +2894,11 @@ static vfs_file_t *ext2_mount_callback(const char *path, const char *device) {
 }
 
 /// Filesystem information.
-static file_system_type ext2_file_system_type = { .name     = "ext2",
-                                                  .fs_flags = 0,
-                                                  .mount =
-                                                    ext2_mount_callback };
+static struct file_system_type ext2_file_system_type = {
+  .name     = "ext2",
+  .fs_flags = 0,
+  .mount    = ext2_mount_callback
+};
 
 int ext2_init(void) {
   // Register the filesystem.

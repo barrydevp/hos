@@ -51,7 +51,7 @@ static ssize_t procv_read(vfs_file_t *file, char *buf, off_t offset,
   // Once we have dealt with the canonical mode, get the character.
   int c = keyboard_pop_back();
 
-  // Check that it's a valid caracter.
+  // Check that it's a valid character.
   if (c < 0)
     return 0;
 
@@ -194,16 +194,15 @@ static int procv_ioctl(vfs_file_t *file, int request, void *data) {
   return 0;
 }
 
-// clang-format off
 /// Filesystem general operations.
-static vfs_sys_operations_t procv_sys_operations = {
+static struct vfs_sys_operations_t procv_sys_operations = {
   .mkdir_f = NULL,
   .rmdir_f = NULL,
-  .stat_f  = NULL
+  .stat_f  = NULL,
 };
 
 /// Filesystem file operations.
-static vfs_file_operations_t procv_fs_operations = {
+static struct vfs_file_operations_t procv_fs_operations = {
   .open_f     = NULL,
   .unlink_f   = NULL,
   .close_f    = NULL,
@@ -212,9 +211,8 @@ static vfs_file_operations_t procv_fs_operations = {
   .lseek_f    = NULL,
   .stat_f     = procv_fstat,
   .ioctl_f    = procv_ioctl,
-  .getdents_f = NULL
+  .getdents_f = NULL,
 };
-// clang-format on
 
 int procv_module_init() {
   proc_dir_entry_t *video = proc_create_entry("video", NULL);

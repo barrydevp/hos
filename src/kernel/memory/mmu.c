@@ -12,17 +12,17 @@ static inline void __allocate_vm_area(vm_area_struct_t *area,
   uintptr_t addr_start = area->vm_start;
   uintptr_t addr_end   = addr_start + size_alloc;
 
-  dprintf("__addr: 0x%p - 0x%p - 0x%p\n", addr_start,
-          __ALIGN_UP(addr_end, (PAGE_SIZE << 10)), PAGE_SIZE << 10);
-  dprintf("__pde_o: %u - %u\n", (addr_start >> 22) & ENTRY_MASK,
-          (addr_end >> 22) & ENTRY_MASK);
+  // dprintf("__addr: 0x%p - 0x%p - 0x%p\n", addr_start,
+  //         __ALIGN_UP(addr_end, (PAGE_SIZE << 10)), PAGE_SIZE << 10);
+  // dprintf("__pde_o: %u - %u\n", (addr_start >> 22) & ENTRY_MASK,
+  //         (addr_end >> 22) & ENTRY_MASK);
   uint32_t pfn_start = (addr_start >> PAGE_SHIFT);
   uint32_t pfn_end   = (__ALIGN_UP(addr_end, PAGE_SIZE) >> PAGE_SHIFT);
   uint32_t pde_start = (pfn_start >> 10) & ENTRY_MASK;
   uint32_t pde_end =
     ((__ALIGN_UP(addr_end, (PAGE_SIZE << 10)) >> 22) & ENTRY_MASK);
 
-  dprintf("__pde: %u - %u\n", pde_start, pde_end);
+  // dprintf("__pde: %u - %u\n", pde_start, pde_end);
   // Setup page table first
   // * Create if not present
   // * Temporary map to PAGE_TABLE_MAP region
@@ -30,8 +30,8 @@ static inline void __allocate_vm_area(vm_area_struct_t *area,
   for (uint32_t i = pde_start; i < pde_end; ++i) {
     pd->entries[i].raw = (ptable_phy_start + ((i - pde_start) << FRAME_SHIFT)) |
                          area->vm_flags;
-    dprintf("pdir[%u]: 0x%p, %u, %u\n", i, pd->entries[i].raw,
-            pd->entries[i].pdbits.frame, ptable_phy_start >> FRAME_SHIFT);
+    // dprintf("pdir[%u]: 0x%p, %u, %u\n", i, pd->entries[i].raw,
+    //         pd->entries[i].pdbits.frame, ptable_phy_start >> FRAME_SHIFT);
   }
   vmm_map_range(PAGE_TABLE_MAP_START + (pde_start << PAGE_SHIFT),
                 ptable_phy_start, (pde_end - pde_start) << PAGE_SHIFT,
@@ -48,11 +48,11 @@ static inline void __allocate_vm_area(vm_area_struct_t *area,
       if (!pt->pages[pte].ptbits.present) {
         vmm_page_allocate(&pt->pages[pte], area->vm_flags);
         // TODO: zero it
-        dprintf("pages[%u](0x%p): 0x%p -> 0x%p (0x%p -> 0x%p)\n", pte,
-                &pt->pages[pte], pfn_start, pt->pages[pte].raw,
-                pd->entries[pde],
-                vmm_get_directory()
-                  ->entries[PDE_INDEX(PAGE_TABLE_MAP_START + pde * 4)]);
+        // dprintf("pages[%u](0x%p): 0x%p -> 0x%p (0x%p -> 0x%p)\n", pte,
+        //         &pt->pages[pte], pfn_start, pt->pages[pte].raw,
+        //         pd->entries[pde],
+        //         vmm_get_directory()
+        //           ->entries[PDE_INDEX(PAGE_TABLE_MAP_START + pde * 4)]);
       }
     }
   }

@@ -34,23 +34,23 @@ int kinit(boot_info_t *_boot_info) {
   dprintf("Initialize the filesystem...\n");
   vfs_init();
 
-  // dprintf("Initialize ATA devices...\n");
-  // if (ata_init()) {
-  //   dprintf("Failed to initialize ATA devices!\n");
-  //   return 1;
-  // }
+  dprintf("Initialize ATA devices...\n");
+  if (ata_init()) {
+    dprintf("Failed to initialize ATA devices!\n");
+    return 1;
+  }
 
-  // dprintf("Initialize EXT2 filesystem...\n");
-  // if (ext2_init()) {
-  //   dprintf("Failed to initialize EXT2 filesystem!\n");
-  //   return 1;
-  // }
-  //
-  // dprintf("Mount EXT2 filesystem...\n");
-  // if (do_mount("ext2", "/", "/dev/hda")) {
-  //   dprintf("Failed to mount EXT2 filesystem...\n");
-  //   return 1;
-  // }
+  dprintf("Initialize EXT2 filesystem...\n");
+  if (ext2_init()) {
+    dprintf("Failed to initialize EXT2 filesystem!\n");
+    return 1;
+  }
+
+  dprintf("Mount EXT2 filesystem...\n");
+  if (do_mount("ext2", "/", "/dev/hda")) {
+    dprintf("Failed to mount EXT2 filesystem...\n");
+    return 1;
+  }
 
   dprintf("Initialize 'procfs'...\n");
   if (procfs_module_init()) {
@@ -95,6 +95,13 @@ int kinit(boot_info_t *_boot_info) {
     return 1;
   }
 
+  dprintf("Creating init process...\n");
+  task_struct *init_p = process_create_init("/bin/init");
+  if (!init_p) {
+    dprintf("Create init process failed!\n");
+    return 1;
+  }
+
   // dprintf("Initialize floating point unit...\n");
   // if (!fpu_init()) {
   //   dprintf("Init floating point uint failed!\n");
@@ -111,29 +118,20 @@ int kinit(boot_info_t *_boot_info) {
 }
 
 int kmain() {
-  // char *video_memory = (char *)0xB8000;
-  // char *video_memory = (char *)0xC03FF000;
-  // *video_memory = 'H';
-
-  // for (int i = 0; i < 80; ++i) {
-  //   for (int j = 0; j < 25; ++j) {
-  //     video_putc(65);
-  //   }
-  // }
   char msg[] = "Hello World From Kernel Space!\n";
   video_puts(msg);
 
-  // Create init process
-  task_struct *init_p = create_task_test("hello");
-  if (!init_p) {
-    dprintf("Failed to create task test.\n");
-  }
-
-  // We have completed the booting procedure.
-  dprintf("Booting done, jumping into userspace process.\n");
-  // Switch to the page directory of init.
-  vmm_switch_directory(init_p->mm->pgd);
-  // Jump into init process.
+  // // Create init process
+  // task_struct *init_p = create_task_test("hello");
+  // if (!init_p) {
+  //   dprintf("Failed to create task test.\n");
+  // }
+  //
+  // // We have completed the booting procedure.
+  // dprintf("Booting done, jumping into userspace process.\n");
+  // // Switch to the page directory of init.
+  // vmm_switch_directory(init_p->mm->pgd);
+  // // Jump into init process.
   // scheduler_enter_user_jmp(
   //   // Entry point.
   //   init_p->thread.regs.eip,

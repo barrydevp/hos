@@ -7,7 +7,9 @@
 *.elf
 *.log
 *.iso
+*.img
 /target
 /base/bin
 Cargo.lock
 isodir
+rootfs

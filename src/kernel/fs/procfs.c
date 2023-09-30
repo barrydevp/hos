@@ -93,21 +93,24 @@ static int procfs_getdents(vfs_file_t *file, dirent_t *dirp, off_t doff,
 // ============================================================================
 
 /// Filesystem general operations.
-static vfs_sys_operations_t procfs_sys_operations = { .mkdir_f = procfs_mkdir,
-                                                      .rmdir_f = procfs_rmdir,
-                                                      .stat_f  = procfs_stat };
+static struct vfs_sys_operations_t procfs_sys_operations = {
+  .mkdir_f = procfs_mkdir,
+  .rmdir_f = procfs_rmdir,
+  .stat_f  = procfs_stat
+};
 
 /// Filesystem file operations.
-static vfs_file_operations_t procfs_fs_operations = { .open_f   = procfs_open,
-                                                      .unlink_f = procfs_unlink,
-                                                      .close_f  = procfs_close,
-                                                      .read_f   = procfs_read,
-                                                      .write_f  = procfs_write,
-                                                      .lseek_f  = procfs_lseek,
-                                                      .stat_f   = procfs_fstat,
-                                                      .ioctl_f  = procfs_ioctl,
-                                                      .getdents_f =
-                                                        procfs_getdents };
+static struct vfs_file_operations_t procfs_fs_operations = {
+  .open_f     = procfs_open,
+  .unlink_f   = procfs_unlink,
+  .close_f    = procfs_close,
+  .read_f     = procfs_read,
+  .write_f    = procfs_write,
+  .lseek_f    = procfs_lseek,
+  .stat_f     = procfs_fstat,
+  .ioctl_f    = procfs_ioctl,
+  .getdents_f = procfs_getdents
+};
 
 // ============================================================================
 // PROCFS Core Functions
@@ -771,10 +774,11 @@ static vfs_file_t *procfs_mount_callback(const char *path, const char *device) {
 }
 
 /// Filesystem information.
-static file_system_type procfs_file_system_type = { .name     = "procfs",
-                                                    .fs_flags = 0,
-                                                    .mount =
-                                                      procfs_mount_callback };
+static struct file_system_type procfs_file_system_type = {
+  .name     = "procfs",
+  .fs_flags = 0,
+  .mount    = procfs_mount_callback
+};
 
 int procfs_module_init() {
   // Initialize the procfs.

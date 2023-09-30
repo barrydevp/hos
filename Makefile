@@ -70,6 +70,7 @@ ARCH_HDRS += $(wildcard include/arch/${ARCH}/*/*.h)
 
 EMU = qemu-system-${ARCH}
 EMU_FLAGS ?= -m 256M
+EMU_FLAGS += -drive file=rootfs.img,format=raw
 
 ifeq ($(DEBUG), 1)
 	EMU_FLAGS += -s -S
