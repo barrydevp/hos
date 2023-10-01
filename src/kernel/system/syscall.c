@@ -56,11 +56,11 @@ void syscall_init() {
     syscalls[it] = sys_ni_syscall;
   }
 
-  syscalls[20] = (syscall_func)call0;
-  syscalls[21] = (syscall_func)call1;
-  syscalls[22] = (syscall_func)print;
+  syscalls[197] = (syscall_func)call0;
+  syscalls[198] = (syscall_func)call1;
+  syscalls[199] = (syscall_func)print;
 
-  // syscalls[__NR_exit]           = (syscall_func)sys_exit;
+  syscalls[__NR_exit]           = (syscall_func)sys_exit;
   // syscalls[__NR_read]           = (syscall_func)sys_read;
   // syscalls[__NR_write]          = (syscall_func)sys_write;
   // syscalls[__NR_open]           = (syscall_func)sys_open;
@@ -119,7 +119,7 @@ void syscall_init() {
   // syscalls[__NR_setitimer]      = (syscall_func)sys_setitimer;
   // syscalls[__NR_getitimer]      = (syscall_func)sys_getitimer;
 
-  // isr_install_handler(SYSTEM_CALL, &syscall_handler, "syscall_handler");
+
 }
 
 pt_regs *get_current_interrupt_stack_frame() {
@@ -159,8 +159,8 @@ void syscall_handler(pt_regs *f) {
   }
   f->eax = ret;
 
-  // // Schedule next process.
-  // scheduler_run(f);
+  // Schedule next process.
+  scheduler_run(f);
   // // Restore fpu state.
   // unswitch_fpu();
 }

@@ -1,4 +1,5 @@
 #include <arch/i386/fpu.h>
+#include <arch/i386/cpu.h>
 
 #include <kernel/kernel.h>
 #include <kernel/process/scheduler.h>
@@ -95,12 +96,12 @@ int kinit(boot_info_t *_boot_info) {
     return 1;
   }
 
-  dprintf("Creating init process...\n");
-  task_struct *init_p = process_create_init("/bin/init");
-  if (!init_p) {
-    dprintf("Create init process failed!\n");
-    return 1;
-  }
+  // dprintf("Creating init process...\n");
+  // task_struct *init_p = process_create_init("/bin/init");
+  // if (!init_p) {
+  //   dprintf("Create init process failed!\n");
+  //   return 1;
+  // }
 
   // dprintf("Initialize floating point unit...\n");
   // if (!fpu_init()) {
@@ -121,22 +122,26 @@ int kmain() {
   char msg[] = "Hello World From Kernel Space!\n";
   video_puts(msg);
 
-  // // Create init process
-  // task_struct *init_p = create_task_test("hello");
-  // if (!init_p) {
-  //   dprintf("Failed to create task test.\n");
-  // }
-  //
-  // // We have completed the booting procedure.
-  // dprintf("Booting done, jumping into userspace process.\n");
-  // // Switch to the page directory of init.
-  // vmm_switch_directory(init_p->mm->pgd);
-  // // Jump into init process.
-  // scheduler_enter_user_jmp(
-  //   // Entry point.
-  //   init_p->thread.regs.eip,
-  //   // Stack pointer.
-  //   init_p->thread.regs.useresp);
+  // Create init process
+  task_struct *init_p = create_task_test("hello");
+  if (!init_p) {
+    dprintf("Failed to create task test.\n");
+  }
+
+  // We have completed the booting procedure.
+  dprintf("Booting done, jumping into userspace process.\n");
+  // Switch to the page directory of init.
+  vmm_switch_directory(init_p->mm->pgd);
+  // Jump into init process.
+  scheduler_enter_user_jmp(
+    // Entry point.
+    init_p->thread.regs.eip,
+    // Stack pointer.
+    init_p->thread.regs.useresp);
+
+  dprintf("After enter User space.\n");
+  // Enable interrupts
+  enable_interrupts();
 
   for (;;) {}
 

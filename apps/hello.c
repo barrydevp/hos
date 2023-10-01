@@ -1,6 +1,6 @@
-#define __NR_call0 20
-#define __NR_call1 21
-#define __NR_print 22
+#define __NR_call0 197
+#define __NR_call1 198
+#define __NR_print 199
 
 /// @brief Heart of the code that calls a system call with 0 parameters.
 #define __inline_syscall0(res, name)                                           \
@@ -39,6 +39,23 @@ _syscall0(int, call0)
 _syscall1(int, call1, int, arg)
 _syscall1(int, print, const char*, arg)
 
+int __libc_start_main(int (*main)(int, char **, char **), int argc, char *argv[], char *envp[])
+{
+  // //dbg_print("== START %-30s =======================================\n", argv[0]);
+  // //dbg_print("__libc_start_main(%p, %d, %p, %p)\n", main, argc, argv, envp);
+  // assert(main && "There is no `main` function.");
+  // assert(argv && "There is no `argv` array.");
+  // assert(envp && "There is no `envp` array.");
+  //dbg_print("environ  : %p\n", environ);
+  // Copy the environ.
+  // environ = envp;
+  // Call the main function.
+  int result = main(argc, argv, envp);
+  // Free the environ.
+  //dbg_print("== END   %-30s =======================================\n", argv[0]);
+  return result;
+}
+
 int main() {
   // printf("Hello World From Userspace!\n");
   char s[] = "0";
@@ -50,6 +67,8 @@ int main() {
   int b = call1(a+1);
   s[0] = (char)(b & 0xff);
   print(s);
+
+  for (;;) {}
 
   return 0;
 }

@@ -51,11 +51,6 @@ void idt_init() {
 
   memset(idt, 0, sizeof(idt));
 
-  // for (int i = 0; i < 256; ++i) {
-  // 	setvect(i, idt_default_handler);
-  // 	INIT_LIST_HEAD(&interrupt_handlers[i]);
-  // }
-
   /** ISRs
    *  0x08 = address of Code Segment in GDT
    *  0x8E = I86_IDT_DESC_PRESENT | I86_IDT_DESC_BIT32
@@ -271,7 +266,7 @@ static pt_regs *_syscall_entrypoint(pt_regs *r) {
    * syscall handlers, but definitely make sure we're not allowing
    * interrupts to remain disabled upon return from a system call.
    */
-  asm volatile("sti");
+  // asm volatile("sti");
 
   return r;
 }

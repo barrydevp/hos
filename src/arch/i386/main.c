@@ -148,9 +148,6 @@ int kenter(uint32_t magic, uint32_t addr) {
     return 1;
   }
 
-  // Enable interrupts
-  enable_interrupts();
-
   /* give control to the real kernel main */
   return kmain();
 }

@@ -89,11 +89,38 @@ LIBS_Y=$(foreach lib,$(LIBS),.make/$(lib).lmak)
 
 # CFLAGS for user mode
 # CFLAGS  = -O2 -g
-CFLAGS  = -O2
-CFLAGS += -Wall -Wextra -Wno-unused-parameter
-CFLAGS += -Iapps
+CFLAGS  = -O3
+# CFLAGS += -Wall -Wextra -Wno-unused-parameter
+# CFLAGS += -Iapps
 # CFLAGS += -fplan9-extensions ${ARCH_USER_CFLAGS}
-CFLAGS += -ffreestanding -nostdlib
+# CFLAGS += -ffreestanding -nostdlib
+CFLAGS += -u_start
+
+# Warning flags.
+CFLAGS += -Wall
+CFLAGS += -Werror
+CFLAGS += -Wpedantic
+CFLAGS += -pedantic-errors
+CFLAGS += -Wshadow
+CFLAGS += -std=gnu99
+
+# Disable some specific warnings.
+CFLAGS += -Wno-unused-function
+CFLAGS += -Wno-unused-variable
+CFLAGS += -Wno-unknown-pragmas
+CFLAGS += -Wno-missing-braces
+CFLAGS += -Wno-unused-command-line-argument
+
+# Set the compiler options.
+CFLAGS += -static
+CFLAGS += -nostdlib
+CFLAGS += -nostdinc
+CFLAGS += -fno-builtin
+CFLAGS += -fno-stack-protector
+CFLAGS += -fno-pic
+CFLAGS += -fomit-frame-pointer
+CFLAGS += -m32
+CFLAGS += -march=i686
 
 LIBC_OBJS  = $(patsubst %.c,%.o,$(wildcard $(SRC)/libc/*.c))
 LIBC_OBJS += $(patsubst %.c,%.o,$(wildcard $(SRC)/libc/*/*.c))
@@ -282,11 +309,16 @@ APP_LINKERLD = $(APP_SRC)/linker.ld
 $(BASE)/bin/%.o: $(BASE)/bin/%
 	objcopy -I binary -O elf32-i386 -B i386 $< $@ 
 
-$(BASE)/bin/%: $(APP_SRC)/%.o $(APP_HDRS) $(APP_LINKERLD)
-	${CC} -T $(APP_LINKERLD) ${CFLAGS} -Iapps -o $@ $<
+$(BASE)/bin/%: $(APP_SRC)/%.o $(APP_HDRS) $(APP_LINKERLD) $(APP_SRC)/crt0.o 
+	# ${CC} -T $(APP_LINKERLD) ${CFLAGS} -Iapps -o $@ $<
+	${CC} ${CFLAGS} -Iapps -o $@ $(APP_SRC)/crt0.o $<
 
 $(APP_SRC)/%.o: $(APP_SRC)/%.c $(APP_HDRS) $(APP_LINKERLD)
-	${CC} -T $(APP_LINKERLD) ${CFLAGS} -Iapps -c -o $@ $<
+	# ${CC} -T $(APP_LINKERLD) ${CFLAGS} -Iapps -c -o $@ $<
+	${CC} ${CFLAGS} -Iapps -c -o $@ $<
+
+$(APP_SRC)/crt%.o: $(APP_SRC)/crt%.S $(APP_HDRS) $(APP_LINKERLD)
+	${CC} ${CFLAGS} -Iapps -c -o $@ $<
 
 TESTFLAGS := -std=gnu99 \
         -I tests/include \
