@@ -77,6 +77,18 @@ int kinit(boot_info_t *_boot_info) {
     return 1;
   }
 
+  dprintf("Initialize random device...\n");
+  if (random_module_init()) {
+    dprintf("Failed to initialize random device!\n");
+    return 1;
+  }
+
+  dprintf("Initialize zero device...\n");
+  if (zero_module_init()) {
+    dprintf("Failed to initialize zero device!\n");
+    return 1;
+  }
+
   dprintf("Setting up PS/2 driver...\n");
   if (ps2_init()) {
     dprintf("Failed to initialize proc system entries!\n");
@@ -121,6 +133,17 @@ int kinit(boot_info_t *_boot_info) {
 int kmain() {
   char msg[] = "Hello World From Kernel Space!\n";
   video_puts(msg);
+
+  // Test VFS
+  char msg1[] = "1234567890";
+  vfs_file_t* rf = vfs_open("/dev/random", 0, 0);
+  vfs_read(rf, msg1, 0, 10);
+  dprintf("%s\n", msg1);
+
+  char msg2[] = "1234567890";
+  vfs_file_t* nf = vfs_open("/dev/zero", 0, 0);
+  vfs_read(nf, msg2, 0, 10);
+  dprintf("%s\n", msg2);
 
   // Create init process
   task_struct *init_p = create_task_test("hello");
