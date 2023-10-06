@@ -273,7 +273,7 @@ int vfs_rmdir(const char *path) {
   return sb_root->sys_operations->rmdir_f(absolute_path);
 }
 
-vfs_file_t *vfs_creat(const char *path, mode_t mode) {
+vfs_file_t *vfs_create(const char *path, mode_t mode) {
   // Allocate a variable for the path.
   char absolute_path[PATH_MAX];
   // If the first character is not the '/' then get the absolute path.
@@ -389,6 +389,7 @@ int vfs_mount(const char *path, vfs_file_t *new_fs_root) {
   super_block_t *sb = kmalloc(sizeof(super_block_t));
   if (!sb) {
     dprintf("Cannot allocate memory for the superblock.\n");
+    return 0;
   } else {
     // Copy the name.
     strcpy(sb->name, new_fs_root->name);

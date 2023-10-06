@@ -112,7 +112,7 @@ int vfs_rmdir(const char *path);
 /// @return file descriptor number, -1 otherwise and errno is set to indicate the error.
 /// @details
 /// It is equivalent to: open(path, O_WRONLY|O_CREAT|O_TRUNC, mode)
-vfs_file_t *vfs_creat(const char *path, mode_t mode);
+vfs_file_t *vfs_create(const char *path, mode_t mode);
 
 /// @brief Stat the file at the given path.
 /// @param path Path to the file for which we are retrieving the statistics.

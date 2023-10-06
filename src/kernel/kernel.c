@@ -15,7 +15,7 @@
 
 #include <kernel/fs/vfs.h>
 #include <kernel/fs/procfs.h>
-#include <kernel/fs/proc_modules.h>
+#include <kernel/fs/modules.h>
 #include "kernel/fs/ata.h"
 #include "kernel/fs/ext2.h"
 

@@ -2894,10 +2894,10 @@ static vfs_file_t *ext2_mount_callback(const char *path, const char *device) {
 }
 
 /// Filesystem information.
-static struct file_system_type ext2_file_system_type = {
+static file_system_type ext2_file_system_type = {
   .name     = "ext2",
   .fs_flags = 0,
-  .mount    = ext2_mount_callback
+  .mount    = ext2_mount_callback,
 };
 
 int ext2_init(void) {

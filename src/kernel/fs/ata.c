@@ -542,20 +542,24 @@ static void ata_device_write_sector(ata_device_t *dev, uint32_t lba,
 
 // == VFS ENTRY GENERATION ====================================================
 /// Filesystem general operations.
-static vfs_sys_operations_t ata_sys_operations = { .mkdir_f = NULL,
-                                                   .rmdir_f = NULL,
-                                                   .stat_f  = ata_stat };
+static vfs_sys_operations_t ata_sys_operations = {
+  .mkdir_f = NULL,
+  .rmdir_f = NULL,
+  .stat_f  = ata_stat,
+};
 
 /// ATA filesystem file operations.
-static vfs_file_operations_t ata_fs_operations = { .open_f     = ata_open,
-                                                   .unlink_f   = NULL,
-                                                   .close_f    = ata_close,
-                                                   .read_f     = ata_read,
-                                                   .write_f    = ata_write,
-                                                   .lseek_f    = NULL,
-                                                   .stat_f     = ata_fstat,
-                                                   .ioctl_f    = NULL,
-                                                   .getdents_f = NULL };
+static vfs_file_operations_t ata_fs_operations = {
+  .open_f     = ata_open,
+  .unlink_f   = NULL,
+  .close_f    = ata_close,
+  .read_f     = ata_read,
+  .write_f    = ata_write,
+  .lseek_f    = NULL,
+  .stat_f     = ata_fstat,
+  .ioctl_f    = NULL,
+  .getdents_f = NULL,
+};
 
 static vfs_file_t *ata_device_create(ata_device_t *dev) {
   // Create the file.

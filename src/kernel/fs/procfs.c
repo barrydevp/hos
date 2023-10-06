@@ -93,14 +93,14 @@ static int procfs_getdents(vfs_file_t *file, dirent_t *dirp, off_t doff,
 // ============================================================================
 
 /// Filesystem general operations.
-static struct vfs_sys_operations_t procfs_sys_operations = {
+static vfs_sys_operations_t procfs_sys_operations = {
   .mkdir_f = procfs_mkdir,
   .rmdir_f = procfs_rmdir,
-  .stat_f  = procfs_stat
+  .stat_f  = procfs_stat,
 };
 
 /// Filesystem file operations.
-static struct vfs_file_operations_t procfs_fs_operations = {
+static vfs_file_operations_t procfs_fs_operations = {
   .open_f     = procfs_open,
   .unlink_f   = procfs_unlink,
   .close_f    = procfs_close,
@@ -109,7 +109,7 @@ static struct vfs_file_operations_t procfs_fs_operations = {
   .lseek_f    = procfs_lseek,
   .stat_f     = procfs_fstat,
   .ioctl_f    = procfs_ioctl,
-  .getdents_f = procfs_getdents
+  .getdents_f = procfs_getdents,
 };
 
 // ============================================================================
@@ -774,10 +774,10 @@ static vfs_file_t *procfs_mount_callback(const char *path, const char *device) {
 }
 
 /// Filesystem information.
-static struct file_system_type procfs_file_system_type = {
+static file_system_type procfs_file_system_type = {
   .name     = "procfs",
   .fs_flags = 0,
-  .mount    = procfs_mount_callback
+  .mount    = procfs_mount_callback,
 };
 
 int procfs_module_init() {
