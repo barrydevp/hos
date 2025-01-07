@@ -161,7 +161,7 @@ qemu-c-kernel-gui: hos.iso
 	$(EMU) $(EMU_FLAGS) -serial stdio -cdrom $^
 
 qemu-c-kernel-vnc: hos.iso
-	printf "change vnc password\n%s\n" 2901 | $(EMU) $(EMU_FLAGS) \
+	printf "change vnc password\n%s\n" 1 | $(EMU) $(EMU_FLAGS) \
 		-vnc :0,password=on \
 		-serial file:c.kernel.log \
 		-monitor stdio \

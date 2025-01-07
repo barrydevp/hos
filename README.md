@@ -41,25 +41,25 @@ export PATH="$PREFIX/bin:$PATH"
 cd $HOME/opt/src
 
 # binutils
-curl -O https://ftp.gnu.org/gnu/binutils/binutils-2.39.tar.xz
-tar xf binutils-2.39.tar.xz
+curl -O https://ftp.gnu.org/gnu/binutils/binutils-2.43.tar.xz
+tar xf binutils-2.43.tar.xz
 
 mkdir build-binutils
 cd build-binutils
-../binutils-2.39/configure --target=$TARGET --prefix="$PREFIX" --with-sysroot --disable-nls --disable-werror
+../binutils-2.43/configure --target=$TARGET --prefix="$PREFIX" --with-sysroot --disable-nls --disable-werror
 make
 make install
 
 # gcc (binutils must completed first)
-curl -O https://ftp.gnu.org/gnu/gcc/gcc-12.2.0/gcc-12.2.0.tar.xz
-tar xf gcc-12.2.0.tar.xz
+curl -O https://ftp.gnu.org/gnu/gcc/gcc-14.2.0/gcc-14.2.0.tar.xz
+tar xf gcc-14.2.0.tar.xz
 
 # The $PREFIX/bin dir _must_ be in the PATH. We did that above.
 which -- $TARGET-as || echo $TARGET-as is not in the PATH
 
 mkdir build-gcc
 cd build-gcc
-../gcc-12.2.0/configure --target=$TARGET --prefix="$PREFIX" --disable-nls --enable-languages=c,c++ --without-headers
+../gcc-14.2.0/configure --target=$TARGET --prefix="$PREFIX" --disable-nls --enable-languages=c,c++ --without-headers
 make all-gcc
 make all-target-libgcc
 make install-gcc
