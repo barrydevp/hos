@@ -2,6 +2,7 @@
 #include <arch/i386/ports.h>
 #include <arch/i386/cpu.h>
 #include <kernel/ctype.h>
+#include <kernel/stdio.h>
 #include <kernel/string.h>
 
 #define HEIGHT 25 ///< The height of the

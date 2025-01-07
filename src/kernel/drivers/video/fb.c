@@ -9,19 +9,19 @@
 #include <kernel/math.h>
 
 /// Counts the number of elements of an array.
-#define COUNT_OF(x) \
+#define COUNT_OF(x)                                                            \
   ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
 
-#define IS_MODE(_width, _height, _colors) \
+#define IS_MODE(_width, _height, _colors)                                      \
   if (width == _width && height == _height && colors == _colors)
 
 /// Framebuffer driver details.
 typedef struct {
-  uint32_t width; ///< Screen's width.
-  uint32_t height; ///< Screen's height.
-  uint8_t bpp; ///< Bits per pixel (bpp).
-  uint32_t pitch; ///< Bits per pixel (bpp).
-  uint8_t *address; ///< Starting address of the screen.
+  uint32_t width;     ///< Screen's width.
+  uint32_t height;    ///< Screen's height.
+  uint8_t bpp;        ///< Bits per pixel (bpp).
+  uint32_t pitch;     ///< Bits per pixel (bpp).
+  uint8_t *address;   ///< Starting address of the screen.
   video_font_t *font; ///< The current font.
 
   // state
@@ -41,16 +41,16 @@ static bool fb_enable = false;
 static fb_driver_t *driver = NULL;
 
 static fb_driver_t driver0 = {
-  .width = 0,
-  .height = 0,
-  .bpp = 0,
-  .pitch = 0,
-  .address = NULL,
-  .font = &font_8x16,
-  .x = 0,
-  .y = 0,
-  .fg = 0,
-  .bg = 0,
+  .width        = 0,
+  .height       = 0,
+  .bpp          = 0,
+  .pitch        = 0,
+  .address      = NULL,
+  .font         = &font_8x16,
+  .x            = 0,
+  .y            = 0,
+  .fg           = 0,
+  .bg           = 0,
   .cursor_state = 0,
 };
 
@@ -87,20 +87,20 @@ static inline void __draw_pixel(int x, int y, uint32_t color) {
   switch (driver->bpp) {
     case 8: {
       uint8_t *pixel = driver->address + driver->pitch * y + x;
-      *pixel = color;
+      *pixel         = color;
     } break;
     case 15:
     case 16: {
-      uint16_t *pixel = driver->address + driver->pitch * y + 2 * x;
-      *pixel = color;
+      uint16_t *pixel = (uint16_t *)driver->address + driver->pitch * y + 2 * x;
+      *pixel          = color;
     } break;
     case 24: {
-      uint32_t *pixel = driver->address + driver->pitch * y + 3 * x;
-      *pixel = (color & 0xffffff) | (*pixel & 0xff000000);
+      uint32_t *pixel = (uint32_t *)driver->address + driver->pitch * y + 3 * x;
+      *pixel          = (color & 0xffffff) | (*pixel & 0xff000000);
     } break;
     case 32: {
-      uint32_t *pixel = driver->address + driver->pitch * y + 4 * x;
-      *pixel = color;
+      uint32_t *pixel = (uint32_t *)driver->address + driver->pitch * y + 4 * x;
+      *pixel          = color;
     } break;
   }
 }
@@ -231,9 +231,7 @@ void fb_putc(int c) {
 }
 
 void fb_puts(const char *str) {
-  while ((*str) != 0) {
-    fb_putc((*str++));
-  }
+  while ((*str) != 0) { fb_putc((*str++)); }
 }
 
 void fb_move_cursor(unsigned int x, unsigned int y) {
@@ -298,17 +296,17 @@ void fb_init(boot_info_t *boot_info) {
   driver = &driver0;
 
   // Set fb info
-  driver->width = mfb->common.framebuffer_width;
+  driver->width  = mfb->common.framebuffer_width;
   driver->height = mfb->common.framebuffer_height;
-  driver->bpp = mfb->common.framebuffer_bpp;
-  driver->pitch = mfb->common.framebuffer_pitch;
+  driver->bpp    = mfb->common.framebuffer_bpp;
+  driver->pitch  = mfb->common.framebuffer_pitch;
   // Set the address.
   driver->address = (uint8_t *)boot_info->video_start;
   // Set the state
-  driver->x = 0;
-  driver->y = 0;
-  driver->fg = 0xffffffff;
-  driver->bg = 0x0;
+  driver->x            = 0;
+  driver->y            = 0;
+  driver->fg           = 0xffffffff;
+  driver->bg           = 0x0;
   driver->cursor_state = 0;
   // Clears the screen.
   fb_clear();

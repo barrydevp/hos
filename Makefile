@@ -3,7 +3,7 @@ include $(SRC)/arch/$(ARCH)/make.config
 
 # CFLAGS for kernel objects and modules
 K_CFLAGS  = -ffreestanding -O2 -g -lgcc
-K_CFLAGS += -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -Wstrict-prototypes -Wwrite-strings
+K_CFLAGS += -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -Wstrict-prototypes -Wwrite-strings -Wno-int-conversion
 K_CFLAGS += ${ARCH_KERNEL_CFLAGS}
 
 # Defined constants for the kernel

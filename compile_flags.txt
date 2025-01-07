@@ -1,12 +1,13 @@
 -Iinclude
 -ffreestanding
+-lgcc
 -Wall
--Wshadow
--std=gnu99
+-Wextra
 -Wno-unused-function
 -Wno-unused-variable
 -Wno-unused-parameter
 -Wno-unkown-pragmas
+-Wno-int-conversion
 -static
 -nostdlib
 -nostdinc
