@@ -59,11 +59,23 @@ which -- $TARGET-as || echo $TARGET-as is not in the PATH
 
 mkdir build-gcc
 cd build-gcc
-../gcc-14.2.0/configure --target=$TARGET --prefix="$PREFIX" --disable-nls --enable-languages=c,c++ --without-headers
+../gcc-14.2.0/configure --target=$TARGET --prefix="$PREFIX" --disable-nls --enable-languages=c,c++ --without-headers --disable-hosted-libstdcxx
 make all-gcc
 make all-target-libgcc
+make all-target-libstdc++-v3
 make install-gcc
 make install-target-libgcc
+make install-target-libstdc++-v3
+
+# gdb
+curl -O https://ftp.gnu.org/gnu/gdb/gdb-14.2.tar.xz
+tar xf gdb-14.2.tar.xz
+
+mkdir build-gdb
+cd build-gdb
+../gdb-14.2/configure --target=$TARGET --prefix="$PREFIX" --disable-werror
+make all-gdb
+make install-gdb
 
 # grub toolchains
 sudo apt install grub-pc-bin xorriso mtools

@@ -22,8 +22,10 @@
 #define PAGES_PER_TABLE 1024
 #define PAGES_PER_DIR 1024
 // Base address of last entry (1024) recursive mapping
-#define PAGE_DIRECTORY_BASE 0xFFFF0000
-#define PAGE_TABLE_BASE 0xFFC00000
+// recursive map: - https://wiki.osdev.org/User:Neon/Recursive_Paging
+// - https://os.phil-opp.com/advanced-paging/
+#define PAGE_DIRECTORY_VIRT 0xFFFFF000 // last entry of PD, PDE[1023]
+#define PAGE_TABLE_BASE 0xFFC00000 // last entry of the first PT, PTE[1023]
 
 #define PDE_INDEX(x) (((x) >> 22) & ENTRY_MASK)
 #define PTE_INDEX(x) (((x) >> 12) & ENTRY_MASK)

@@ -148,13 +148,13 @@ all-cvnc: qemu-c-kernel-vnc
 PHONY += qemu-kernel qemu-c-kernel qemu-c-kernel-gui qemu-c-kernel-vnc
 
 qemu-kernel: hos.kernel
-	$(EMU) $(EMU_FLAGS) -nographic -curses -kernel $^
+	$(EMU) $(EMU_FLAGS) -nographic -display curses -kernel $^
 	# $(EMU) $(EMU_FLAGS) -kernel $^ -s -S
 
 qemu-c-kernel: hos.iso
-	# $(EMU) $(EMU_FLAGS) -nographic -curses -serial file:c.kernel.log -kernel $^
-	$(EMU) $(EMU_FLAGS) -nographic -curses -serial stdio -cdrom $^
-	# $(EMU) $(EMU_FLAGS) -nographic -curses -s -S -serial file:c.kernel.log -kernel $^
+	# $(EMU) $(EMU_FLAGS) -nographic -display curses -serial file:c.kernel.log -kernel $^
+	$(EMU) $(EMU_FLAGS) -nographic -display curses -serial file:c.kernel.log -cdrom $^
+	# $(EMU) $(EMU_FLAGS) -nographic -display curses -s -S -serial file:c.kernel.log -kernel $^
 	# $(EMU) $(EMU_FLAGS) -kernel $^ -s -S -serial file:c.kernel.log
 
 qemu-c-kernel-gui: hos.iso

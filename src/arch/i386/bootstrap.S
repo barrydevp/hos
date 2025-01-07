@@ -50,11 +50,16 @@ mb2_tag_fb:
 #.word 0
 .word 1
 .long 20
-#.long 1024
-#.long 768
-.long 640
-.long 480
+.long 1024
+.long 768
 .long 16
+# .long 640
+# .long 480
+# .long 16
+# .long 80
+# .long 25
+# .long 16
+mb2_tag_fb_end:
 
 /* Modules alignment tag */
 .align 8
@@ -63,7 +68,6 @@ mb2_tag_fb:
 .long 8
 
 /* End tag */
-mb2_tag_fb_end:
 .align 8
 .word 0
 .word 0
@@ -85,9 +89,9 @@ _kernel_stack_top:
 .type _start, @function
 _start:
 	# Set up the stack. Since paging is not enable yet
-	# we need to store the real physical addr of stack
-	# later after enable paging, we set it back to higher
-	# half address
+	# we need to use physical address of the kernel stack
+	# and current _kernel_stack_top is virtual address
+	# thus, we have to minus KERNEL_HIGHER_HAFL to get the physical one
 	mov $(_kernel_stack_top - KERNEL_HIGHER_HAFL), %esp
 	/* Make sure our stack is 16-byte aligned */
 	and $-16, %esp
@@ -102,31 +106,38 @@ _start:
 
 
 _setup_paging:
-	.extern init_page_region
+	.extern init_page_region // located at: src/kernel/memory/vmm.c
 	/* Set up initial page region, which was zero'd for us by the loader */
+	// we need to minus KERNEL_HIGHER_HAFL since paging is not enable
+	// and init_page_region is virtual address
 	mov $(init_page_region - KERNEL_HIGHER_HAFL), %edi
 
 	/* PDT[0] = &PT[0] | (PRESENT, WRITABLE, KERNEL) */
+	/*        = init_page_region[0] | ... */
 	// notice flag is 0x3 and remain 0x1000 is offset to the PT[0] pointer
 	// which can be break as: mov 0x03, eax; add 0x1000, eax
-	// first 4MB identity map
+	// first 4MB identity map, https://wiki.osdev.org/Identity_Paging
+	// where we map exactly first 4MB of physical address to 4MB of virtual address
 	mov $0x1003, %eax  
 	add %edi, %eax
 	mov %eax, (%edi)
 
 	/* PDT[768] = &PT[0] | (PRESENT, WRITABLE, KERNEL) */
-	// kernel higher half mapping (remember size of entry = 4B)
+	/*          = init_page_region[0] | ... */
+	// kernel higher half mapping (remember size of each entry = 4bytes)
+	// first 4MB from kernel higher half virtual address also refer to first 4MB of physical address
 	add $768 * 4, %edi
 	mov %eax, (%edi)
 
 	/* PDT[769] = &PT[1] | (PRESENT, WRITABLE, KERNEL) */
-	// Next 4MB
+	/*          = init_page_region[1] | ... */
+	// Next 4MB (boot + kernel code)
 	add $4, %edi
 	add $0x1000, %eax
 	mov %eax, (%edi)
 
 	/* PDT[769] = &PT[1] | (PRESENT, WRITABLE, KERNEL) */
-	// next 4MB identity map (this will contain the multiboot)
+	// next 4MB identity map (this will contain the multiboot + kernel)
 	sub $768 * 4, %edi
 	mov %eax, (%edi)
 

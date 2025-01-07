@@ -217,6 +217,7 @@ int32_t keyboard_isr(pt_regs *f) {
     // Nothing to do.
   } else if (!(scancode & CODE_BREAK)) {
     dprintf("scancode : %04x\n", scancode);
+    printf("scancode : %04x\n", scancode);
     // Get the current keymap.
     const keymap_t *keymap = get_keymap(scancode);
     // Get the specific keymap.

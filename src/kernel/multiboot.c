@@ -70,7 +70,7 @@ void multiboot_init(uint32_t magic, uint32_t addr) {
         dprintf("mmap: %u\n", mboot.multiboot_mmap->size);
       } break;
       case MULTIBOOT_TAG_TYPE_FRAMEBUFFER: {
-        printf("framebuffer\n");
+        dprintf("framebuffer\n");
 
         mboot.multiboot_framebuffer = (struct multiboot_tag_framebuffer *)tag;
         // multiboot_uint32_t color;

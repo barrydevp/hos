@@ -43,8 +43,8 @@ extern void *_kernel_end;
 #define PAGE_TABLE_MAP_START 0xCF800000
 #define PAGE_TABLE_MAP_END   KERNEL_HEAP_END // 8MB (2 pdir = 2048 ptable)
 
-#define KERNEL_PDE_START 768 // virtAddress from 0xC0000000
-#define KERNEL_INIT_NPDE 2   // one PDE mean one page table (4MB)
+#define KERNEL_PDE_START_IDX 768 // virtAddress from 0xC0000000
+#define KERNEL_INIT_NPTE 2   // one PDE mean one page table (4MB)
 
 /** utilities */
 /// @brief Align the addr ceil

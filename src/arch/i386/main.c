@@ -56,8 +56,14 @@ static inline void boot_init(uint32_t magic, uint32_t addr) {
   addressable_size -= reserved_size;
 
   // framebuffer region
-  // TODO: move to multiboot.c function
   struct multiboot_tag_framebuffer *fb = mboot.multiboot_framebuffer;
+  dprintf("Framebuffer:\n"
+          " type: %u\n"
+          " width: %u\n"
+          " height: %u\n"
+          " depth: %u\n",
+          fb->common.framebuffer_type, fb->common.framebuffer_width,
+          fb->common.framebuffer_height, fb->common.framebuffer_bpp);
   if (fb &&
       fb->common.framebuffer_type != MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT) {
     // framebuffer support

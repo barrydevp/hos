@@ -11,8 +11,8 @@
 
 /* Initial memory maps loaded by boostrap */
 #define _pagemap __attribute__((aligned(PAGE_SIZE))) = { 0 }
-// [0] = init PDT for boot and will become kernel PDT, [1] = identity+boot+kernel PT
-union PML init_page_region[1 + KERNEL_INIT_NPDE][PAGE_TABLE_SIZE] _pagemap;
+// [0] = init PDE (page directory table) for boot and will become kernel PDE, [1..] = identity+boot+kernel PTE (page tables)
+union PML init_page_region[1 + KERNEL_INIT_NPTE][PAGE_TABLE_SIZE] _pagemap;
 
 /// The mm_struct of the kernel.
 // static mm_struct_t k_mm _pagemap;
@@ -107,15 +107,15 @@ page_directory_t *vmm_get_directory(void) {
  * @brief Get current page directory recursive virtual address
  */
 page_directory_t *vmm_r_get_directory(void) {
-  // It's easy because we use recursive mapping
-  return (page_directory_t *)0xFFFFF000;
+  // It's easy because we use recursive mapping, the last entry PDE[1023]
+  return (page_directory_t *)PAGE_DIRECTORY_VIRT;
 }
 
 /**
  * @brief Get page table recursive address of provided virtAddr page
  */
 page_table_t *vmm_r_get_ptable(uintptr_t virtAddr) {
-  // It's easy because we use recursive mapping
+  // It's easy because we use recursive mapping, the last entry PTE[1023]
   return (page_table_t *)PAGE_TABLE_BASE + PDE_INDEX(virtAddr);
 }
 
@@ -423,7 +423,7 @@ void vmm_init(struct boot_info_t *boot_info) {
   // k_pdir->entries[0].raw = 0;
 
   /* Preallocate ptable for higher half kernel and set KERNEL ACCESS protected */
-  for (int i = KERNEL_PDE_START + KERNEL_INIT_NPDE; i < 1023; ++i) {
+  for (int i = KERNEL_PDE_START_IDX + KERNEL_INIT_NPTE; i < 1023; ++i) {
     vmm_pde_allocate(&k_pdir->entries[i], PML_KERNEL_ACCESS);
   }
 
