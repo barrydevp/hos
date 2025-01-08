@@ -102,9 +102,9 @@ sudo apt install grub-pc-bin xorriso mtools
 
 ### Some other Kernel - OS and Credits
 
-[toaruos](https://github.com/klange/toaruos) <- mainly base on this code base
+[mentos](https://github.com/mentos-team/MentOS) <- mainly base on this code base
 
-[mentos](https://github.com/mentos-team/MentOS)
+[toaruos](https://github.com/klange/toaruos)
 
 [mquy/mos](https://github.com/MQuy/mos)
 

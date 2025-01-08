@@ -206,7 +206,7 @@ page_directory_t *vmm_clone_pdir(page_directory_t *from) {
  *          an intermediary paging level and @p flags did not have @c MMU_GET_MAKE set.
  */
 union PML *vmm_create_page(uintptr_t virtAddr, uint32_t flags) {
-  dprintf("create_page(0x%p)\n", virtAddr);
+  /* dprintf("create_page(0x%p)\n", virtAddr); */
 
   virtAddr           = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
   uintptr_t pageAddr = virtAddr >> PAGE_SHIFT;
@@ -285,7 +285,7 @@ _noentry:
 
 union PML *vmm_map_page(uintptr_t virtAddr, uintptr_t physAddr,
                         uint32_t flags) {
-  dprintf("map_page(0x%p, 0x%p)\n", virtAddr, physAddr);
+  /* dprintf("map_page(0x%p, 0x%p)\n", virtAddr, physAddr); */
   virtAddr           = __ALIGN_DOWN(virtAddr, PAGE_SIZE);
   uintptr_t pageAddr = virtAddr >> PAGE_SHIFT;
   uint32_t pd_entry  = (pageAddr >> 10) & ENTRY_MASK;

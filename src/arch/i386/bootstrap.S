@@ -50,12 +50,12 @@ mb2_tag_fb:
 #.word 0
 .word 1
 .long 20
-.long 1024
-.long 768
-.long 16
-# .long 640
-# .long 480
+# .long 1024
+# .long 768
 # .long 16
+.long 640
+.long 480
+.long 16
 # .long 80
 # .long 25
 # .long 16

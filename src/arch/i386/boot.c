@@ -58,22 +58,35 @@ static inline void boot_init(uint32_t magic, uint32_t addr) {
   // framebuffer region
   struct multiboot_tag_framebuffer *fb = mboot.multiboot_framebuffer;
   dprintf("Framebuffer:\n"
+          " addr: 0x%p\n"
           " type: %u\n"
           " width: %u\n"
           " height: %u\n"
-          " depth: %u\n",
-          fb->common.framebuffer_type, fb->common.framebuffer_width,
-          fb->common.framebuffer_height, fb->common.framebuffer_bpp);
+          " depth: %u\n"
+          " pitch: %u\n",
+          (uintptr_t)fb->common.framebuffer_addr, fb->common.framebuffer_type,
+          fb->common.framebuffer_width, fb->common.framebuffer_height,
+          fb->common.framebuffer_bpp, fb->common.framebuffer_pitch);
   if (fb &&
       fb->common.framebuffer_type != MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT) {
+    dprintf("RGB framebuffer:\n"
+            " red_pos: %u\n"
+            " red_mask_size: %u\n"
+            " green_pos: %u\n"
+            " green_mask_size: %u\n"
+            " blue_pos: %u\n"
+            " blue_mask_size: %u\n",
+            fb->framebuffer_red_field_position, fb->framebuffer_red_mask_size,
+            fb->framebuffer_green_field_position,
+            fb->framebuffer_green_mask_size,
+            fb->framebuffer_blue_field_position,
+            fb->framebuffer_blue_mask_size);
     // framebuffer support
     boot_info.video_type                         = VIDEO_TYPE_FRAMEBUFFER;
     struct multiboot_tag_framebuffer_common *fbc = &fb->common;
     boot_info.video_phy_start                    = fbc->framebuffer_addr;
     boot_info.video_phy_end =
-      fbc->framebuffer_addr +
-      fbc->framebuffer_width * fbc->framebuffer_bpp / 8 +
-      fbc->framebuffer_height * fbc->framebuffer_pitch;
+      fbc->framebuffer_addr + fbc->framebuffer_height * fbc->framebuffer_pitch;
   } else {
     // EGA text mode
     boot_info.video_type      = VIDEO_TYPE_EGA_TEXT;

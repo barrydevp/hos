@@ -530,6 +530,7 @@ repeat:
         break;
 
       case 'X':
+        base = 16;
         flags |= FLAGS_UPPERCASE;
         break;
 

@@ -1,5 +1,8 @@
+#include <kernel/multiboot2.h>
+#include <kernel/printf.h>
 #include <kernel/drivers/video/fb.h>
 #include <kernel/drivers/video/font.h>
+#include <kernel/drivers/video/palette.h>
 
 #include <arch/i386/ports.h>
 #include <arch/i386/cpu.h>
@@ -16,13 +19,17 @@
   if (width == _width && height == _height && colors == _colors)
 
 /// Framebuffer driver details.
+// https://wiki.osdev.org/Drawing_In_a_Linear_Framebuffer
 typedef struct {
-  uint32_t width;     ///< Screen's width.
-  uint32_t height;    ///< Screen's height.
-  uint8_t bpp;        ///< Bits per pixel (bpp).
-  uint32_t pitch;     ///< Bits per pixel (bpp).
+  uint32_t width;  ///< Screen's width.
+  uint32_t height; ///< Screen's height.
+  uint8_t bpp;     ///< Bits per pixel (bpp).
+  uint32_t
+    pitch; ///< how many bytes of VRAM you should skip to go one pixel down (width * bpp/8).
   uint8_t *address;   ///< Starting address of the screen.
   video_font_t *font; ///< The current font.
+  palette_entry_t *palette;
+  struct multiboot_tag_framebuffer *mfb;
 
   // state
   int x;
@@ -38,15 +45,12 @@ static bool fb_enable = false;
 /// A buffer for storing a copy of the video memory.
 // char vidmem[262144];
 /// Current driver.
-static fb_driver_t *driver = NULL;
+static fb_driver_t *fb_driver = NULL;
 
-static fb_driver_t driver0 = {
-  .width        = 0,
-  .height       = 0,
-  .bpp          = 0,
-  .pitch        = 0,
+static fb_driver_t fb_driver_640x480_16 = {
   .address      = NULL,
   .font         = &font_8x16,
+  .palette      = rgb565_16_palette,
   .x            = 0,
   .y            = 0,
   .fg           = 0,
@@ -54,18 +58,16 @@ static fb_driver_t driver0 = {
   .cursor_state = 0,
 };
 
-/// @brief Reads from the video memory.
-/// @param offset where we are going to read.
-/// @return the value we read.
-static inline unsigned char __read_byte(unsigned int offset) {
-  return (unsigned char)(*(driver->address + offset));
-}
-
-/// @brief Writes onto the video memory.
-/// @param offset where we are going to write.
-static inline void __write_byte(unsigned int offset, unsigned char value) {
-  *(char *)(driver->address + offset) = value;
-}
+static fb_driver_t fb_driver_720x480_16 = {
+  .address      = NULL,
+  .font         = &font_8x16,
+  .palette      = rgb565_16_palette,
+  .x            = 0,
+  .y            = 0,
+  .fg           = 0,
+  .bg           = 0,
+  .cursor_state = 0,
+};
 
 int fb_is_enabled() {
   return fb_enable;
@@ -73,34 +75,49 @@ int fb_is_enabled() {
 
 int fb_width() {
   if (fb_enable)
-    return driver->width;
+    return fb_driver->width;
   return 0;
 }
 
 int fb_height() {
   if (fb_enable)
-    return driver->height;
+    return fb_driver->height;
   return 0;
 }
 
+static inline uint32_t __get_color(palette_entry_t palette) {
+  struct multiboot_tag_framebuffer *mfb = fb_driver->mfb;
+  uint32_t color                        = 0x0;
+  color |= (((1 << mfb->framebuffer_red_mask_size) - 1) & palette.red)
+        << mfb->framebuffer_red_field_position;
+  color |= (((1 << mfb->framebuffer_green_mask_size) - 1) & palette.green)
+        << mfb->framebuffer_green_field_position;
+  color |= (((1 << mfb->framebuffer_blue_mask_size) - 1) & palette.blue)
+        << mfb->framebuffer_blue_field_position;
+  return color;
+}
+
 static inline void __draw_pixel(int x, int y, uint32_t color) {
-  switch (driver->bpp) {
+  switch (fb_driver->bpp) {
     case 8: {
-      uint8_t *pixel = driver->address + driver->pitch * y + x;
+      uint8_t *pixel = fb_driver->address + fb_driver->pitch * y + x;
       *pixel         = color;
     } break;
     case 15:
     case 16: {
-      uint16_t *pixel = (uint16_t *)driver->address + driver->pitch * y + 2 * x;
-      *pixel          = color;
+      uint16_t *pixel =
+        (uint16_t *)(fb_driver->address + fb_driver->pitch * y + 2 * x);
+      *pixel = color;
     } break;
     case 24: {
-      uint32_t *pixel = (uint32_t *)driver->address + driver->pitch * y + 3 * x;
-      *pixel          = (color & 0xffffff) | (*pixel & 0xff000000);
+      uint32_t *pixel =
+        (uint32_t *)(fb_driver->address + fb_driver->pitch * y + 3 * x);
+      *pixel = (color & 0xffffff) | (*pixel & 0xff000000);
     } break;
     case 32: {
-      uint32_t *pixel = (uint32_t *)driver->address + driver->pitch * y + 4 * x;
-      *pixel          = color;
+      uint32_t *pixel =
+        (uint32_t *)(fb_driver->address + fb_driver->pitch * y + 4 * x);
+      *pixel = color;
     } break;
   }
 }
@@ -122,10 +139,11 @@ void fb_draw_char(int x, int y, unsigned char c, uint32_t fg, uint32_t bg) {
     1u << 7u, //          128
     1u << 8u, //          256
   };
-  const unsigned char *glyph = driver->font->font + c * driver->font->height;
-  for (unsigned iy = 0; iy < driver->font->height; ++iy) {
-    for (unsigned ix = 0; ix < driver->font->width; ++ix) {
-      __draw_pixel(x + (driver->font->width - ix), y + iy,
+  const unsigned char *glyph =
+    fb_driver->font->font + c * fb_driver->font->height;
+  for (unsigned iy = 0; iy < fb_driver->font->height; ++iy) {
+    for (unsigned ix = 0; ix < fb_driver->font->width; ++ix) {
+      __draw_pixel(x + (fb_driver->font->width - ix), y + iy,
                    glyph[iy] & mask[ix] ? fg : bg);
     }
   }
@@ -134,7 +152,7 @@ void fb_draw_char(int x, int y, unsigned char c, uint32_t fg, uint32_t bg) {
 void fb_draw_string(int x, int y, const char *str, uint32_t fg, uint32_t bg) {
   char i = 0;
   while (*str != '\0') {
-    fb_draw_char(x + i * 8, y, *str, fg, bg);
+    fb_draw_char(x + i * fb_driver->font->width, y, *str, fg, bg);
     str++;
     i++;
   }
@@ -202,28 +220,28 @@ void fb_draw_triangle(int x1, int y1, int x2, int y2, int x3, int y3,
 }
 
 inline static void __fb_clear_cursor() {
-  for (unsigned cy = 0; cy < driver->font->height; ++cy)
-    for (unsigned cx = 0; cx < driver->font->width; ++cx)
-      fb_draw_pixel(driver->x + cx, driver->y + cy, 0);
+  for (unsigned cy = 0; cy < fb_driver->font->height; ++cy)
+    for (unsigned cx = 0; cx < fb_driver->font->width; ++cx)
+      fb_draw_pixel(fb_driver->x + cx, fb_driver->y + cy, 0);
 }
 
 inline static void __fb_draw_cursor() {
   uint32_t color =
-    (driver->cursor_state = (driver->cursor_state == 0)) * driver->fg;
-  for (unsigned cy = 0; cy < driver->font->height; ++cy)
-    for (unsigned cx = 0; cx < driver->font->width; ++cx)
-      fb_draw_pixel(driver->x + cx, driver->y + cy, color);
+    (fb_driver->cursor_state = (fb_driver->cursor_state == 0)) * fb_driver->fg;
+  for (unsigned cy = 0; cy < fb_driver->font->height; ++cy)
+    for (unsigned cx = 0; cx < fb_driver->font->width; ++cx)
+      fb_draw_pixel(fb_driver->x + cx, fb_driver->y + cy, color);
 }
 
 void fb_putc(int c) {
-  if (driver->cursor_state)
+  if (fb_driver->cursor_state)
     __fb_clear_cursor();
   // If the character is '\n' go the new line.
   if (c == '\n') {
     fb_new_line();
   } else if ((c >= 0x20) && (c <= 0x7E)) {
-    fb_draw_char(driver->x, driver->y, c, driver->fg, driver->bg);
-    if ((uint32_t)(driver->x += driver->font->width) >= driver->width)
+    fb_draw_char(fb_driver->x, fb_driver->y, c, fb_driver->fg, fb_driver->bg);
+    if ((uint32_t)(fb_driver->x += fb_driver->font->width) >= fb_driver->width)
       fb_new_line();
   } else {
     return;
@@ -235,40 +253,72 @@ void fb_puts(const char *str) {
 }
 
 void fb_move_cursor(unsigned int x, unsigned int y) {
-  driver->x = x * driver->font->width;
-  driver->y = y * driver->font->height;
+  fb_driver->x = x * fb_driver->font->width;
+  fb_driver->y = y * fb_driver->font->height;
   __fb_draw_cursor();
 }
 
 void fb_get_cursor_position(unsigned int *x, unsigned int *y) {
   if (x)
-    *x = driver->x / driver->font->width;
+    *x = fb_driver->x / fb_driver->font->width;
   if (y)
-    *y = driver->y / driver->font->height;
+    *y = fb_driver->y / fb_driver->font->height;
 }
 
 void fb_get_screen_size(unsigned int *width, unsigned int *height) {
   if (width)
-    *width = driver->width / driver->font->width;
+    *width = fb_driver->width / fb_driver->font->width;
   if (height)
-    *height = driver->height / driver->font->height;
+    *height = fb_driver->height / fb_driver->font->height;
 }
 
 void fb_clear() {
-  memset(driver->address, 0, 64 * 1024);
-  driver->x = 0;
-  driver->y = 0;
+  memset(fb_driver->address, fb_driver->bg,
+         fb_driver->height * fb_driver->pitch);
+  fb_driver->x = 0;
+  fb_driver->y = 0;
+}
+
+inline unsigned int __line_height() {
+  // Just the 5x6 font needs some space.
+  const unsigned int vertical_space = (fb_driver->font == &font_5x6);
+  const unsigned int line_height    = fb_driver->font->height + vertical_space;
+
+  return line_height;
+}
+
+void fb_shift_one_line_up() {
+  // Calculate number of lines
+  const unsigned int line_height = __line_height();
+  const unsigned int max_lines   = (fb_driver->height) / line_height;
+
+  // Move the screen up by one line.
+  for (uint32_t i = 0; i < max_lines - 1; ++i) {
+    memcpy(fb_driver->address + (fb_driver->pitch * line_height * i),
+           fb_driver->address + (fb_driver->pitch * line_height * (i + 1)),
+           fb_driver->pitch * line_height);
+  }
+
+  // Blank the last line.
+  memset(fb_driver->address + fb_driver->pitch * line_height * (max_lines - 1),
+         fb_driver->bg,
+         fb_driver->pitch *
+           (fb_driver->height - (max_lines - 1) * line_height));
+
+  // Shift the cursor one line
+  fb_driver->y -= line_height;
 }
 
 void fb_new_line() {
-  // Just the 5x6 font needs some space.
-  const unsigned int vertical_space = (driver->font == &font_5x6);
+  const unsigned int line_height = __line_height();
+
   // Go back at the beginning of the line.
-  driver->x = 0;
-  if ((uint32_t)(driver->y += driver->font->height + vertical_space) >=
-      (driver->height - driver->font->height)) {
-    driver->y = 0;
-    fb_clear();
+  fb_driver->x = 0;
+  fb_driver->y += line_height;
+  if ((uint32_t)(fb_driver->y + line_height) > (fb_driver->height)) {
+    /* fb_driver->y = 0; */
+    /* fb_clear(); */
+    fb_shift_one_line_up();
   }
 }
 
@@ -279,8 +329,8 @@ void fb_update() {
 }
 
 void fb_set_color(uint32_t fg, uint32_t bg) {
-  driver->fg = fg;
-  driver->bg = bg;
+  fb_driver->fg = fg;
+  fb_driver->bg = bg;
 }
 
 void fb_init(boot_info_t *boot_info) {
@@ -290,24 +340,48 @@ void fb_init(boot_info_t *boot_info) {
   // framebuffer un-supported
   if (!mfb) {
     // EGA 80x25 text mode
+    dprintf("[WARN]: Unsupported EGA 80x25 text mode in framebuffer driver!\n");
     return;
   }
 
-  driver = &driver0;
+  if (mfb->common.framebuffer_type != MULTIBOOT_FRAMEBUFFER_TYPE_RGB) {
+    dprintf("[WARN]: Unsupported non-RGB in framebuffer driver!\n");
+    return;
+  }
+
+  struct multiboot_tag_framebuffer_common *fb = &mfb->common;
+
+  if (fb->framebuffer_bpp == 16) {
+    if (fb->framebuffer_width == 720 && fb->framebuffer_height == 480) {
+      fb_driver      = &fb_driver_720x480_16;
+      fb_driver->mfb = mfb;
+      fb_driver->fg  = __get_color(fb_driver->palette[White_16]);
+      fb_driver->bg  = __get_color(fb_driver->palette[Black_16]);
+    } else if (fb->framebuffer_width == 640 && fb->framebuffer_height == 480) {
+      fb_driver      = &fb_driver_640x480_16;
+      fb_driver->mfb = mfb;
+      /* dprintf(">>>>>>>>>>>>>>>>>> 0x%X\n", __get_color(fb_driver->palette[Blue_16_1])); */
+      fb_driver->fg = __get_color(fb_driver->palette[White_16]);
+      fb_driver->bg = __get_color(fb_driver->palette[Black_16]);
+    }
+  }
+
+  if (!fb_driver) {
+    dprintf("[WARN]: Unsupported framebuffer driver!\n");
+    return;
+  }
 
   // Set fb info
-  driver->width  = mfb->common.framebuffer_width;
-  driver->height = mfb->common.framebuffer_height;
-  driver->bpp    = mfb->common.framebuffer_bpp;
-  driver->pitch  = mfb->common.framebuffer_pitch;
+  fb_driver->width  = fb->framebuffer_width;
+  fb_driver->height = fb->framebuffer_height;
+  fb_driver->bpp    = fb->framebuffer_bpp;
+  fb_driver->pitch  = fb->framebuffer_pitch;
   // Set the address.
-  driver->address = (uint8_t *)boot_info->video_start;
+  fb_driver->address = (uint8_t *)boot_info->video_start;
   // Set the state
-  driver->x            = 0;
-  driver->y            = 0;
-  driver->fg           = 0xffffffff;
-  driver->bg           = 0x0;
-  driver->cursor_state = 0;
+  fb_driver->x            = 0;
+  fb_driver->y            = 0;
+  fb_driver->cursor_state = 0;
   // Clears the screen.
   fb_clear();
   // Set the Framebuffer as enabled.

@@ -109,3 +109,5 @@ void fb_new_line();
 /// @brief Change the color.
 void fb_set_color(uint32_t fg, uint32_t bg);
 
+/// @brief Shift the screen one line up.
+void fb_shift_one_line_up();
