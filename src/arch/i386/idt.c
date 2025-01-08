@@ -5,6 +5,7 @@
 #include <kernel/printf.h>
 #include <kernel/arch.h>
 #include <kernel/system/syscall.h>
+#include <kernel/memory/vmm.h>
 
 extern void idt_load(uint32_t);
 
@@ -146,7 +147,8 @@ static void panic(const char *desc, pt_regs *r, uint32_t faulting_address) {
           "  $esi=0x%p,$edi=0x%p,$ebp=0x%p,$esp=0x%p\n"
           "  $eax=0x%p,$ebx=0x%p,$ecx=0x%p,$edx=0x%p\n"
           "  $gs=0x%p,$fs=0x%p,$es=0x%p,$ds=0x%p\n"
-          "  cs=0x%p ss=0x%p eflags=0x%p int=0x%x err=0x%x\n",
+          "  $cs=0x%p,$ss=0x%p\n"
+          " eflags=0x%p int=0x%x err=0x%x\n",
           r->eip, r->esi, r->edi, r->ebp, r->esp, r->eax, r->ebx, r->ecx,
           r->edx, r->gs, r->fs, r->es, r->ds, r->cs, r->ss, r->eflags,
           r->int_no, r->err_code);
@@ -212,6 +214,7 @@ static void _general_protection_fault(pt_regs *r) {
 static void _page_fault(pt_regs *r) {
   /* Obtain the "cause" address */
   uintptr_t faulting_address;
+  // get the Page Fault Linear Address from cr2
   asm volatile("mov %%cr2, %0" : "=r"(faulting_address));
 
   // /* 8DEADBEEFh is the magic ret-from-sig address. */

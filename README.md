@@ -2,8 +2,6 @@
 
 Hobby or hope?
 
-Written in 3 maybe 4 programing languages, asm, C, Rust, Zig(future).
-
 # Prerequisites
 
 For Ubuntu(Debian)-Linux only!
@@ -82,6 +80,13 @@ sudo apt install grub-pc-bin xorriso mtools
 
 ```
 
+## Debugging
+
+### Tips
+
+- https://student.cs.uwaterloo.ca/~cs350/common/gdb.html
+- https://github.com/jtsiomb/pcboot/blob/master/gdbnotes
+
 
 ## Resources
 
@@ -95,11 +100,11 @@ sudo apt install grub-pc-bin xorriso mtools
 
 [Dreamos82 Osdev-Notes](https://github.com/dreamos82/Osdev-Notes)
 
-### Some other Kernel - OS
+### Some other Kernel - OS and Credits
 
-[mentos](https://github.com/mentos-team/MentOS) <- mainly base on this code base
+[toaruos](https://github.com/klange/toaruos) <- mainly base on this code base
 
-[toaruos](https://github.com/klange/toaruos)
+[mentos](https://github.com/mentos-team/MentOS)
 
 [mquy/mos](https://github.com/MQuy/mos)
 
