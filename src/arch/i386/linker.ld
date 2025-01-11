@@ -41,9 +41,9 @@ SECTIONS
 	{
 		_kernel_data_start = .;
 		*(.data)
-		*(.symbols)
-		PROVIDE(_kernel_symbols_start = .);
-		PROVIDE(_kernel_symbols_end = .);
+		/* *(.symbols) */
+		/* PROVIDE(_kernel_symbols_start = .); */
+		/* PROVIDE(_kernel_symbols_end = .); */
 		_kernel_data_end = .;
 		PROVIDE(bss_start = .);
 	}

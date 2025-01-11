@@ -1,3 +1,6 @@
+/// Copyright (c) 2014-2024 MentOs-Team
+/// Copyright (c) 2022-2024 Minh Hai Dao (barrydevp)
+
 #include <kernel/drivers/video.h>
 #include <kernel/drivers/video/ega.h>
 #include <kernel/drivers/video/vga.h>

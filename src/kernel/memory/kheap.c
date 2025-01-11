@@ -1,3 +1,6 @@
+/// Copyright (c) 2014-2024 MentOs-Team
+/// Copyright (c) 2022-2025 Minh Hai Dao (barrydevp)
+
 #include <kernel/memory/mmu.h>
 #include <kernel/memory/vmm.h>
 #include <kernel/process/task.h>

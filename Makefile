@@ -70,7 +70,7 @@ ARCH_HDRS += $(wildcard include/arch/${ARCH}/*/*.h)
 
 EMU = qemu-system-${ARCH}
 EMU_FLAGS ?= -m 256M
-EMU_FLAGS += -drive file=rootfs.img,format=raw
+EMU_FLAGS += -drive file=rootfs.img,format=raw,index=0,media=disk
 
 ifeq ($(DEBUG), 1)
 	EMU_FLAGS += -s -S
@@ -151,23 +151,27 @@ qemu-kernel: hos.kernel
 	$(EMU) $(EMU_FLAGS) -nographic -display curses -kernel $^
 	# $(EMU) $(EMU_FLAGS) -kernel $^ -s -S
 
-qemu-c-kernel: hos.iso
-	# $(EMU) $(EMU_FLAGS) -nographic -display curses -serial file:c.kernel.log -kernel $^
-	$(EMU) $(EMU_FLAGS) -nographic -display curses -serial file:c.kernel.log -cdrom $^
-	# $(EMU) $(EMU_FLAGS) -nographic -display curses -s -S -serial file:c.kernel.log -kernel $^
-	# $(EMU) $(EMU_FLAGS) -kernel $^ -s -S -serial file:c.kernel.log
+qemu-c-kernel: hos.iso rootfs.img
+	# $(EMU) $(EMU_FLAGS) -nographic -display curses -serial file:c.kernel.log -kernel hos.kernel
+	$(EMU) $(EMU_FLAGS) -nographic -display curses -serial file:c.kernel.log -boot d -cdrom hos.iso
+	# $(EMU) $(EMU_FLAGS) -nographic -display curses -s -S -serial file:c.kernel.log -kernel hos.kernel
+	# $(EMU) $(EMU_FLAGS) -s -S -serial file:c.kernel.log -kernel hos.kernel
 
-qemu-c-kernel-gui: hos.iso
-	$(EMU) $(EMU_FLAGS) -serial stdio -cdrom $^
+qemu-c-kernel-gui: hos.iso rootfs.img
+	$(EMU) $(EMU_FLAGS) -serial stdio -boot d -cdrom hos.iso
 
-qemu-c-kernel-vnc: hos.iso
+qemu-c-kernel-vnc: hos.iso rootfs.img
 	printf "change vnc password\n%s\n" 1 | $(EMU) $(EMU_FLAGS) \
 		-vnc :0,password=on \
 		-serial file:c.kernel.log \
 		-monitor stdio \
-		-cdrom $^
+		-boot d \
+		-cdrom hos.iso
 
 PHONY += hos.bin
+
+rootfs.img:
+	-bash create_filesystem.sh
 
 hos.iso: hos.bin
 	-cp multiboot/grub.cfg isodir/boot/grub/grub.cfg
@@ -221,6 +225,7 @@ clean:
 	-rm -f hos.kernel
 	-rm -rf isodir
 	-rm -f hos.iso
+	# -rm -f rootfs.img
 
 
 $(BASE)/lib/ld.so: linker/linker.c $(BASE)/lib/libc.a | dirs $(LIBC)

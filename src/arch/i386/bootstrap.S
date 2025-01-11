@@ -2,7 +2,7 @@
 .section .multiboot.data, "aw"
 
 /* global constant */
-.set KERNEL_HIGHER_HAFL, 0xC0000000
+.set KERNEL_HIGHER_HALF, 0xC0000000
 
 /* Multiboot 2 header */
 .set MB2_MAGIC,    0xe85250d6
@@ -91,8 +91,8 @@ _start:
 	# Set up the stack. Since paging is not enable yet
 	# we need to use physical address of the kernel stack
 	# and current _kernel_stack_top is virtual address
-	# thus, we have to minus KERNEL_HIGHER_HAFL to get the physical one
-	mov $(_kernel_stack_top - KERNEL_HIGHER_HAFL), %esp
+	# thus, we have to minus KERNEL_HIGHER_HALF to get the physical one
+	mov $(_kernel_stack_top - KERNEL_HIGHER_HALF), %esp
 	/* Make sure our stack is 16-byte aligned */
 	and $-16, %esp
 
@@ -108,9 +108,9 @@ _start:
 _setup_paging:
 	.extern init_page_region // located at: src/kernel/memory/vmm.c
 	/* Set up initial page region, which was zero'd for us by the loader */
-	// we need to minus KERNEL_HIGHER_HAFL since paging is not enable
+	// we need to minus KERNEL_HIGHER_HALF since paging is not enable
 	// and init_page_region is virtual address
-	mov $(init_page_region - KERNEL_HIGHER_HAFL), %edi
+	mov $(init_page_region - KERNEL_HIGHER_HALF), %edi
 
 	/* PDT[0] = &PT[0] | (PRESENT, WRITABLE, KERNEL) */
 	/*        = init_page_region[0] | ... */
@@ -158,7 +158,7 @@ _set_entry:
 
 _en_paging:
 	# Set cr3 to the address of the page_directory.
-	mov $(init_page_region - KERNEL_HIGHER_HAFL), %edi
+	mov $(init_page_region - KERNEL_HIGHER_HALF), %edi
 	mov %edi, %cr3
 
 	# Set PSE bit in CR4 to enable 4MB pages
@@ -191,7 +191,7 @@ start_hihger_half:
 
 	# We set the stack back to higher half 
 	mov %esp, %eax
-	add $KERNEL_HIGHER_HAFL, %eax
+	add $KERNEL_HIGHER_HALF, %eax
 	mov %eax, %esp
 
 	# Enter the high-level kernel.

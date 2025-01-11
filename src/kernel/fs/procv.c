@@ -214,7 +214,7 @@ static vfs_file_operations_t procv_fs_operations = {
   .getdents_f = NULL,
 };
 
-int procv_module_init() {
+int procv_init() {
   proc_dir_entry_t *video = proc_create_entry("video", NULL);
   if (video == NULL) {
     dprintf("Cannot create `/proc/video`.\n");

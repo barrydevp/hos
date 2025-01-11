@@ -48,43 +48,43 @@ int kinit(boot_info_t *_boot_info) {
   }
 
   dprintf("Mount EXT2 filesystem...\n");
-  if (do_mount("ext2", "/", "/dev/hda")) {
+  if (do_mount(EXT2, "/", "/dev/hda")) {
     dprintf("Failed to mount EXT2 filesystem...\n");
     return 1;
   }
 
   dprintf("Initialize 'procfs'...\n");
-  if (procfs_module_init()) {
+  if (procfs_init()) {
     dprintf("Failed to register `procfs`!\n");
     return 1;
   }
 
   dprintf("Mounting 'procfs'...\n");
-  if (do_mount("procfs", "/proc", NULL)) {
+  if (do_mount(PROCFS, "/proc", NULL)) {
     dprintf("Failed to mount procfs at `/proc`!\n");
     return 1;
   }
 
   dprintf("Initialize video procfs file...\n");
-  if (procv_module_init()) {
+  if (procv_init()) {
     dprintf("Failed to initialize `/proc/video`!\n");
     return 1;
   }
 
   dprintf("Initialize system procfs file...\n");
-  if (procs_module_init()) {
+  if (procs_init()) {
     dprintf("Failed to initialize proc system entries!\n");
     return 1;
   }
 
   dprintf("Initialize random device...\n");
-  if (random_module_init()) {
+  if (random_init()) {
     dprintf("Failed to initialize random device!\n");
     return 1;
   }
 
   dprintf("Initialize zero device...\n");
-  if (zero_module_init()) {
+  if (zero_init()) {
     dprintf("Failed to initialize zero device!\n");
     return 1;
   }
@@ -115,11 +115,11 @@ int kinit(boot_info_t *_boot_info) {
   //   return 1;
   // }
 
-  // dprintf("Initialize floating point unit...\n");
-  // if (!fpu_init()) {
-  //   dprintf("Init floating point uint failed!\n");
-  //   return 1;
-  // }
+  /* dprintf("Initialize floating point unit...\n"); */
+  /* if (!fpu_init()) { */
+  /*   dprintf("Init floating point uint failed!\n"); */
+  /*   return 1; */
+  /* } */
 
   dprintf("Initialize signals...\n");
   if (!signals_init()) {
@@ -135,13 +135,13 @@ int kmain() {
   video_puts(msg);
 
   // Test VFS
-  char msg1[] = "1234567890";
-  vfs_file_t* rf = vfs_open("/dev/random", 0, 0);
+  char msg1[]    = "1234567890";
+  vfs_file_t *rf = vfs_open("/dev/random", 0, 0);
   vfs_read(rf, msg1, 0, 10);
   dprintf("%s\n", msg1);
 
-  char msg2[] = "1234567890";
-  vfs_file_t* nf = vfs_open("/dev/zero", 0, 0);
+  char msg2[]    = "1234567890";
+  vfs_file_t *nf = vfs_open("/dev/zero", 0, 0);
   vfs_read(nf, msg2, 0, 10);
   dprintf("%s\n", msg2);
 

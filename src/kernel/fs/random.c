@@ -1,3 +1,6 @@
+/// Copyright (C) 2014-2018 K. Lange
+/// Copyright (c) 2022-2025 Minh Hai Dao (barrydevp)
+
 #include <kernel/fs/modules.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/fcntl.h>
@@ -59,8 +62,7 @@ static vfs_file_t *random_device_create(void) {
   vfs_file_t *fnode = kmalloc(sizeof(vfs_file_t));
   if (!fnode) {
     dprintf(
-      "random_device_create(%p): Failed to allocate memory for VFS file!\n",
-      fnode);
+      "random_device_create(): Failed to allocate memory for VFS file!\n");
     return NULL;
   }
 
@@ -77,12 +79,12 @@ static vfs_file_t *random_device_create(void) {
   fnode->sys_operations = &randomfs_sys_operations;
   fnode->fs_operations  = &randomfs_fs_operations;
 
-  dprintf("random_device_create(%p): VFS file : %p\n", fnode);
+  dprintf("random_device_create(): VFS file : %p\n", fnode);
 
   return random_fs = fnode;
 }
 
-int random_module_init() {
+int random_init() {
   vfs_file_t *fnode = random_device_create();
   vfs_mount("/dev/random", fnode);
   vfs_mount("/dev/urandom", fnode);

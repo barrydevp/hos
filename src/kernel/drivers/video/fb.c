@@ -360,7 +360,6 @@ void fb_init(boot_info_t *boot_info) {
     } else if (fb->framebuffer_width == 640 && fb->framebuffer_height == 480) {
       fb_driver      = &fb_driver_640x480_16;
       fb_driver->mfb = mfb;
-      /* dprintf(">>>>>>>>>>>>>>>>>> 0x%X\n", __get_color(fb_driver->palette[Blue_16_1])); */
       fb_driver->fg = __get_color(fb_driver->palette[White_16]);
       fb_driver->bg = __get_color(fb_driver->palette[Black_16]);
     }

@@ -5,6 +5,10 @@
 #include <kernel/dirent.h>
 #include <kernel/stat.h>
 
+/// Supported FS types
+#define EXT2 "ext2"
+#define PROCFS "procfs" 
+
 #define PATH_SEPARATOR '/' ///< The character used as path separator.
 #define PATH_SEPARATOR_STRING "/" ///< The string used as path separator.
 #define PATH_UP ".." ///< The path to the parent.

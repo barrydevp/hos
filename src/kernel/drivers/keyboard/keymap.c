@@ -1,3 +1,6 @@
+/// Copyright (c) 2014-2024 MentOs-Team
+/// Copyright (c) 2022-2024 Minh Hai Dao (barrydevp)
+
 #include <kernel/drivers/keyboard/keymap.h>
 #include <kernel/string.h>
 

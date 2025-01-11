@@ -1,3 +1,6 @@
+/// Copyright (c) 2014-2024 MentOs-Team
+/// Copyright (c) 2022-2025 Minh Hai Dao (barrydevp)
+
 #include <kernel/fs/procfs.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/memory/mmu.h>
@@ -775,12 +778,12 @@ static vfs_file_t *procfs_mount_callback(const char *path, const char *device) {
 
 /// Filesystem information.
 static file_system_type procfs_file_system_type = {
-  .name     = "procfs",
+  .name     = PROCFS,
   .fs_flags = 0,
   .mount    = procfs_mount_callback,
 };
 
-int procfs_module_init() {
+int procfs_init() {
   // Initialize the procfs.
   memset(&fs, 0, sizeof(struct procfs_t));
   // Initialize the cache.
@@ -792,11 +795,11 @@ int procfs_module_init() {
   return 0;
 }
 
-int procfs_cleanup_module() {
+int procfs_cleanup() {
   // Destroy the cache.
   // kmem_cache_destroy(fs.procfs_file_cache);
   // Unregister the filesystem.
-  vfs_register_filesystem(&procfs_file_system_type);
+  vfs_unregister_filesystem(&procfs_file_system_type);
   return 0;
 }
 

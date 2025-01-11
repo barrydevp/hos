@@ -1,3 +1,6 @@
+/// Copyright (C) 2014-2018 K. Lange
+/// Copyright (c) 2022-2025 Minh Hai Dao (barrydevp)
+
 #include <kernel/fs/vfs.h>
 #include <kernel/memory/mmu.h>
 #include <kernel/fcntl.h>
@@ -71,8 +74,7 @@ static vfs_file_t *null_device_create(void) {
   // vfs_file_t *fnode = kmem_cache_alloc(vfs_file_cache, GFP_KERNEL);
   vfs_file_t *fnode = kmalloc(sizeof(vfs_file_t));
   if (!fnode) {
-    dprintf("null_device_create(%p): Failed to allocate memory for VFS file!\n",
-            fnode);
+    dprintf("null_device_create(): Failed to allocate memory for VFS file!\n");
     return NULL;
   }
 
@@ -89,7 +91,7 @@ static vfs_file_t *null_device_create(void) {
   fnode->sys_operations = &nullfs_sys_operations;
   fnode->fs_operations  = &nullfs_fs_operations;
 
-  dprintf("null_device_create(%p): VFS file : %p\n", fnode);
+  dprintf("null_device_create(): VFS file : %p\n", fnode);
 
   return null_fs = fnode;
 }
@@ -98,8 +100,7 @@ static vfs_file_t *zero_device_create(void) {
   // vfs_file_t *fnode = kmem_cache_alloc(vfs_file_cache, GFP_KERNEL);
   vfs_file_t *fnode = kmalloc(sizeof(vfs_file_t));
   if (!fnode) {
-    dprintf("zero_device_create(%p): Failed to allocate memory for VFS file!\n",
-            fnode);
+    dprintf("zero_device_create(): Failed to allocate memory for VFS file!\n");
     return NULL;
   }
 
@@ -121,7 +122,7 @@ static vfs_file_t *zero_device_create(void) {
   return zero_fs = fnode;
 }
 
-int zero_module_init() {
+int zero_init() {
   vfs_mount("/dev/null", null_device_create());
   vfs_mount("/dev/zero", zero_device_create());
 

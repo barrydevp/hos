@@ -1,3 +1,6 @@
+/// Copyright (c) 2014-2024 MentOs-Team
+/// Copyright (c) 2022-2024 Minh Hai Dao (barrydevp)
+
 #include <kernel/fs/ext2.h>
 
 #include <kernel/kernel.h>
@@ -2895,7 +2898,7 @@ static vfs_file_t *ext2_mount_callback(const char *path, const char *device) {
 
 /// Filesystem information.
 static file_system_type ext2_file_system_type = {
-  .name     = "ext2",
+  .name     = EXT2,
   .fs_flags = 0,
   .mount    = ext2_mount_callback,
 };

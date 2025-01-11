@@ -78,7 +78,7 @@ static vfs_file_operations_t procs_fs_operations = { .open_f     = NULL,
                                                      .ioctl_f    = NULL,
                                                      .getdents_f = NULL };
 
-int procs_module_init() {
+int procs_init() {
   proc_dir_entry_t *system_entry;
   // == /proc/uptime ========================================================
   if ((system_entry = proc_create_entry("uptime", NULL)) == NULL) {

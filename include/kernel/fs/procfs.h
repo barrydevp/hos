@@ -1,3 +1,6 @@
+/// Copyright (c) 2014-2024 MentOs-Team
+/// Copyright (c) 2022-2025 Minh Hai Dao (barrydevp)
+
 #pragma once
 
 #include <kernel/fs/vfs_types.h>
@@ -17,11 +20,19 @@ typedef struct proc_dir_entry_t {
 
 /// @brief Initialize the procfs filesystem.
 /// @return 0 if fails, 1 if succeed.
-int procfs_module_init();
+int procfs_init();
 
 /// @brief Clean up the procfs filesystem.
 /// @return 0 if fails, 1 if succeed.
-int procfs_cleanup_module();
+int procfs_cleanup();
+
+/// @brief Initialize the procfs video files.
+/// @return 0 on success, 1 on failure.
+int procv_init();
+
+/// @brief Initialize the procfs system files.
+/// @return 0 on success, 1 on failure.
+int procs_init();
 
 /// @brief Finds the direntry inside `/proc` or under the given `parent`.
 /// @param name   The name of the entry we are searching.
